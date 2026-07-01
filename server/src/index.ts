@@ -47,9 +47,16 @@ app.get("/debug-paths", (_req, res) => {
 });
 
 app.use(express.static(clientPath));
+
+const indexPath = path.join(clientPath, "index.html");
+
+app.get("/", (_req, res) => {
+  res.sendFile(indexPath);
+});
+
 app.get("*", (req, res) => {
   if (!req.path.startsWith("/api/") && !req.path.startsWith("/uploads/")) {
-    res.sendFile(path.join(clientPath, "index.html"));
+    res.sendFile(indexPath);
   }
 });
 
