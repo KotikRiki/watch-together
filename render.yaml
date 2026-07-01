@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: watch-together
+    runtime: node
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install && npm run build
+    startCommand: cd server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production

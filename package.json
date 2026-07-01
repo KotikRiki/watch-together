@@ -1,0 +1,8 @@
+{
+  "name": "watch-together",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd client && npm install && npm run build && cd ../server && npm install && npm run build && cp -r ../client/dist ./client-dist",
+    "start": "cd server && node dist/index.js"
+  }
+}
