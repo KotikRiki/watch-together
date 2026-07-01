@@ -22,9 +22,20 @@ app.use("/api/rooms", roomsRouter);
 app.use("/api/upload", uploadRouter);
 setupUploadServing(app);
 
-const clientDist = path.join(process.cwd(), "../client/dist");
-const altClientDist = path.join(__dirname, "../../client/dist");
-const clientPath = fs.existsSync(clientDist) ? clientDist : altClientDist;
+// On Render: cwd=server, client at ../client/dist
+// On cPanel: cwd=public_html/app, client at client/dist
+// Local dev: cwd=server, client at ../client/dist
+const possiblePaths = [
+  path.join(process.cwd(), "../client/dist"),
+  path.join(process.cwd(), "client/dist"),
+  path.join(__dirname, "../../client/dist"),
+  path.join(__dirname, "../client/dist"),
+];
+console.log("CWD:", process.cwd());
+console.log("__dirname:", __dirname);
+console.log("Possible client paths:", possiblePaths.map(p => ({ path: p, exists: fs.existsSync(path.join(p, "index.html")) })));
+const clientPath = possiblePaths.find(p => fs.existsSync(path.join(p, "index.html"))) || possiblePaths[0];
+console.log("Using clientPath:", clientPath);
 app.use(express.static(clientPath));
 app.get("*", (req, res) => {
   if (!req.path.startsWith("/api/") && !req.path.startsWith("/uploads/")) {
