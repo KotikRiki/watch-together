@@ -36,6 +36,16 @@ console.log("__dirname:", __dirname);
 console.log("Possible client paths:", possiblePaths.map(p => ({ path: p, exists: fs.existsSync(path.join(p, "index.html")) })));
 const clientPath = possiblePaths.find(p => fs.existsSync(path.join(p, "index.html"))) || possiblePaths[0];
 console.log("Using clientPath:", clientPath);
+
+app.get("/debug-paths", (_req, res) => {
+  res.json({
+    cwd: process.cwd(),
+    dirname: __dirname,
+    paths: possiblePaths.map(p => ({ path: p, indexExists: fs.existsSync(path.join(p, "index.html")), dirExists: fs.existsSync(p) })),
+    clientPath,
+  });
+});
+
 app.use(express.static(clientPath));
 app.get("*", (req, res) => {
   if (!req.path.startsWith("/api/") && !req.path.startsWith("/uploads/")) {
