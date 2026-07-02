@@ -5,6 +5,8 @@ import { VideoPlayer } from "./VideoPlayer";
 import type { VideoPlayerHandle } from "./VideoPlayer";
 import { Chat } from "./Chat";
 import { Queue } from "./Queue";
+import { FloatingMessages } from "./FloatingMessages";
+import { BottomSheet } from "./BottomSheet";
 
 interface Message {
   id: string;
@@ -37,7 +39,7 @@ export function Room() {
   const [isHost, setIsHost] = useState(false);
   const [hostOnly, setHostOnly] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
-  const [showChat, setShowChat] = useState(true);
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [peerTimes, setPeerTimes] = useState<{ time: number; isPlaying: boolean; username: string }[]>([]);
   const videoPlayerRef = useRef<VideoPlayerHandle>(null);
   const lastSyncEventRef = useRef(0);
@@ -461,6 +463,7 @@ export function Room() {
               onPlayerReady={() => setPlayerReady(true)}
               syncAction={syncAction}
             />
+            <FloatingMessages messages={messages} />
             {reactions.map((r) => (
               <div
                 key={r.id}
@@ -543,16 +546,22 @@ export function Room() {
             </form>
           </div>
 
-          {/* Mobile chat toggle */}
-          <button onClick={() => setShowChat(!showChat)} className="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-semibold border border-gray-700">
-            {showChat ? "💬 Скрыть чат" : "💬 Показать чат"}
+          {/* Mobile chat button */}
+          <button
+            onClick={() => setShowBottomSheet(true)}
+            className="w-full bg-gray-800 text-white py-2.5 rounded-lg text-sm font-semibold border border-gray-700 flex items-center justify-center gap-2"
+          >
+            💬 Чат
+            {messages.length > 0 && (
+              <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                {messages.length > 99 ? "99+" : messages.length}
+              </span>
+            )}
           </button>
 
-          {showChat && (
-            <div className="h-64">
-              <Chat messages={messages} onSendMessage={(text) => emitChatMessage(username, text)} onReaction={handleReaction} username={username} />
-            </div>
-          )}
+          <BottomSheet open={showBottomSheet} onClose={() => setShowBottomSheet(false)}>
+            <Chat messages={messages} onSendMessage={(text) => emitChatMessage(username, text)} onReaction={handleReaction} username={username} />
+          </BottomSheet>
 
           {isHost && (
             <div className="bg-gray-800/50 rounded-lg p-3">
@@ -571,7 +580,18 @@ export function Room() {
         </div>
       </main>
 
-      <style>{`@keyframes float-up { 0% { opacity:1; transform:translateY(0) scale(1); } 100% { opacity:0; transform:translateY(-100px) scale(1.5); } }`}</style>
+      <style>{`
+        @keyframes float-up {
+          0% { opacity:1; transform:translateY(0) scale(1); }
+          100% { opacity:0; transform:translateY(-100px) scale(1.5); }
+        }
+        @keyframes floatMsg {
+          0% { opacity: 0; transform: translateY(10px); }
+          15% { opacity: 1; transform: translateY(0); }
+          85% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { getDB, generateId, saveDB } from "../db/sqlite";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -32,6 +33,25 @@ uploadRouter.post("/", upload.single("video"), (req, res) => {
 
   const filename = req.file.filename;
   const url = `/uploads/${filename}`;
+  const roomCode = req.body.roomCode as string;
+
+  const db = getDB();
+  let roomId: string | null = null;
+  if (roomCode) {
+    const room = db.rooms.find((r: any) => r.code === roomCode);
+    if (room) roomId = room.id;
+  }
+
+  db.uploads.push({
+    id: generateId(),
+    roomId,
+    filename,
+    originalName: req.file.originalname,
+    size: req.file.size,
+    uploadedBy: req.body.username || null,
+    createdAt: new Date().toISOString(),
+  });
+  saveDB();
 
   res.json({
     url,

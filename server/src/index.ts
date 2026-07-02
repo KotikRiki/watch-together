@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { roomsRouter } from "./routes/rooms";
 import { uploadRouter, setupUploadServing } from "./routes/upload";
+import { adminRouter } from "./routes/admin";
 import { setupSocketHandlers } from "./socket/handlers";
 import { initDB } from "./db/sqlite";
 
@@ -20,6 +21,7 @@ app.use(express.json());
 
 app.use("/api/rooms", roomsRouter);
 app.use("/api/upload", uploadRouter);
+app.use("/api/admin", adminRouter);
 setupUploadServing(app);
 
 // On Render: cwd=server, client at ../client/dist

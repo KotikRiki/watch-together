@@ -3,14 +3,20 @@ import path from "path";
 
 const DB_PATH = path.join(process.cwd(), "data.json");
 
-let db: any = { rooms: [], messages: [], queue: [] };
+let db: any = { rooms: [], messages: [], queue: [], uploads: [] };
 
 export function initDB() {
   if (fs.existsSync(DB_PATH)) {
     try {
       db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+      if (!db.uploads) db.uploads = [];
+      db.rooms.forEach((r: any) => {
+        if (r.views === undefined) r.views = 0;
+        if (!r.lastActive) r.lastActive = r.createdAt;
+        if (r.totalMessages === undefined) r.totalMessages = 0;
+      });
     } catch {
-      db = { rooms: [], messages: [], queue: [] };
+      db = { rooms: [], messages: [], queue: [], uploads: [] };
     }
   } else {
     saveDB();

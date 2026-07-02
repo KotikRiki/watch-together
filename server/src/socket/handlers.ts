@@ -47,6 +47,14 @@ export function setupSocketHandlers(io: Server) {
         socket.emit("host-changed", { isHost: true });
       }
 
+      const db = getDB();
+      const dbRoom = db.rooms.find((r: any) => r.code === roomCode);
+      if (dbRoom) {
+        dbRoom.views = (dbRoom.views || 0) + 1;
+        dbRoom.lastActive = new Date().toISOString();
+        saveDB();
+      }
+
       socket.emit("room-state", {
         videoUrl: roomState.videoUrl,
         videoType: roomState.videoType,
@@ -128,6 +136,12 @@ export function setupSocketHandlers(io: Server) {
       const msgId = generateId();
       const msg = { id: msgId, roomId, author: message.author, text: message.text, createdAt: new Date().toISOString() };
       db.messages.push(msg);
+
+      const dbRoom = db.rooms.find((r: any) => r.id === roomId);
+      if (dbRoom) {
+        dbRoom.totalMessages = (dbRoom.totalMessages || 0) + 1;
+        dbRoom.lastActive = new Date().toISOString();
+      }
       saveDB();
 
       io.to(roomCode).emit("new-message", msg);
