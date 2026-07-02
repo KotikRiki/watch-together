@@ -318,7 +318,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // File player
     if (isFile) {
       return (
-        <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
+        <div className="w-full h-full bg-black rounded-lg overflow-hidden">
           <video
             ref={videoRef}
             src={videoUrl}
@@ -367,7 +367,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     if (videoInfo.type === "youtube") {
       return (
-        <div className="w-full aspect-video bg-black rounded-lg overflow-hidden relative">
+        <div className="w-full h-full bg-black rounded-lg overflow-hidden relative">
           <div ref={containerRef} className="w-full h-full" />
           <a
             href={getOriginalUrl()}
@@ -382,7 +382,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     }
 
     return (
-      <div className="w-full aspect-video bg-black rounded-lg overflow-hidden relative">
+      <div className="w-full h-full bg-black rounded-lg overflow-hidden relative">
         <iframe
           ref={iframeRef}
           key={videoInfo.id}

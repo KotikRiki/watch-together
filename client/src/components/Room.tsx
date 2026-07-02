@@ -631,7 +631,7 @@ export function Room() {
           {videoUrl && (
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
               {adPlaying && (
-                <div className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold animate-pulse mb-1.5 inline-block">📺 Реклама — синхр.暂停</div>
+                <div className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold animate-pulse mb-1.5 inline-block">📺 Реклама</div>
               )}
               <div className="flex items-center gap-1.5">
                 {!playerReady ? (
@@ -639,12 +639,12 @@ export function Room() {
                 ) : !canControl ? (
                   <span className="text-orange-400 text-[10px]">🔒</span>
                 ) : null}
-                <button onClick={handlePlayPause} disabled={!playerReady || !canControl} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
                   {playerState === "playing" ? "⏸" : "▶"}
                 </button>
-                <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏪</button>
-                <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏩</button>
-                <button onClick={handleSync} disabled={!playerReady} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">🔄</button>
+                <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏪</button>
+                <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏩</button>
+                <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">🔄</button>
                 <span className="text-white/70 text-[11px] font-mono ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
                 <label className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer">
                   📁
