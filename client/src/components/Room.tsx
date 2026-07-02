@@ -102,8 +102,6 @@ export function Room() {
 
     on("video-sync", (data: { action: string; time: number; userId: string }) => {
       if (data.userId === socket?.id) return;
-      const sinceExternal = Date.now() - lastExternalChangeRef.current;
-      if (sinceExternal < 1500) return;
       setSyncAction({ action: data.action, time: data.time });
       setTimeout(() => setSyncAction(null), 300);
     });
@@ -484,8 +482,6 @@ export function Room() {
                   const time = videoPlayerRef.current?.getCurrentTime() || 0;
                   const action = newAd ? "pause" : "play";
                   emitVideoSync(action, time);
-                  setSyncAction({ action, time });
-                  setTimeout(() => setSyncAction(null), 300);
                   if (newAd) socket?.emit("ad-started", code);
                   else socket?.emit("ad-ended", code);
                 }}
@@ -684,8 +680,6 @@ export function Room() {
                     const time = videoPlayerRef.current?.getCurrentTime() || 0;
                     const action = newAd ? "pause" : "play";
                     emitVideoSync(action, time);
-                    setSyncAction({ action, time });
-                    setTimeout(() => setSyncAction(null), 300);
                     if (newAd) socket?.emit("ad-started", code);
                     else socket?.emit("ad-ended", code);
                   }}
