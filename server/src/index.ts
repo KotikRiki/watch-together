@@ -10,6 +10,13 @@ import { adminRouter } from "./routes/admin";
 import { setupSocketHandlers } from "./socket/handlers";
 import { initDB } from "./db/postgres";
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -50,13 +57,26 @@ setupSocketHandlers(io);
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
-initDB().then(() => {
+function startServer() {
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
-}).catch((err) => {
-  console.error("Failed to init database, using JSON fallback:", err.message);
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT} (JSON fallback)`);
-  });
-});
+}
+
+async function initWithRetry(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await initDB();
+      console.log("Database connected successfully");
+      return;
+    } catch (err: any) {
+      console.error(`Database connection attempt ${i + 1} failed: ${err.message}`);
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+  }
+  console.error("All database connection attempts failed, starting with JSON fallback");
+}
+
+initWithRetry().then(() => startServer()).catch(() => startServer());

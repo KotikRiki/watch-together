@@ -12,8 +12,14 @@ function getPool(): pg.Pool {
     pool = new pg.Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
+      max: 5,
+    });
+    pool.on("error", (err) => {
+      console.error("Pool error (will reset on next request):", err.message);
+      pool = null;
+      usePostgres = false;
     });
   }
   return pool;
@@ -41,7 +47,14 @@ export function generateId(): string {
 
 export async function query(text: string, params?: any[]) {
   if (usePostgres) {
-    return getPool().query(text, params);
+    try {
+      return await getPool().query(text, params);
+    } catch (err: any) {
+      console.error("PostgreSQL query error, falling back to JSON:", err.message);
+      usePostgres = false;
+      pool = null;
+      return jsonQuery(text, params);
+    }
   }
   return jsonQuery(text, params);
 }
@@ -357,7 +370,6 @@ function jsonQuery(text: string, params?: any[]): Promise<{ rows: any[] }> {
 
 export async function initDB() {
   if (process.env.DATABASE_URL) {
-    usePostgres = true;
     const client = await getPool().connect();
     try {
       await client.query(`
@@ -419,6 +431,7 @@ export async function initDB() {
         CREATE INDEX IF NOT EXISTS idx_watch_sessions_username ON watch_sessions(username);
         CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
       `);
+      usePostgres = true;
       console.log("Database initialized (PostgreSQL)");
     } finally {
       client.release();
