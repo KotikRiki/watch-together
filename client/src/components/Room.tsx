@@ -55,7 +55,6 @@ export function Room() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSyncEventRef = useRef(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mobileVideoContainerRef = useRef<HTMLDivElement>(null);
   const syncFromActionRef = useRef(false);
   const syncingRef = useRef(false);
 
@@ -336,16 +335,6 @@ export function Room() {
     socket?.emit("set-host-only", code, newVal);
   };
 
-  const handleFullscreen = () => {
-    const el = mobileVideoContainerRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      el.requestFullscreen();
-    }
-  };
-
   const handleExternalStateChange = (newState: "playing" | "paused") => {
     if (syncFromActionRef.current) return;
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
@@ -618,7 +607,7 @@ export function Room() {
       {/* Mobile layout — full-screen video + chat overlay */}
       <div className="lg:hidden fixed inset-0 bg-black flex flex-col" style={{ top: "52px" }}>
         {/* Video — full width, takes remaining space */}
-        <div ref={mobileVideoContainerRef} className="relative flex-1 min-h-0">
+        <div className="relative flex-1 min-h-0">
           <VideoPlayer
             ref={videoPlayerRef}
             videoUrl={videoUrl}
@@ -658,7 +647,7 @@ export function Room() {
               {adPlaying && (
                 <div className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold animate-pulse mb-1.5 inline-block">📺 Реклама</div>
               )}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {!playerReady ? (
                   <span className="text-yellow-400 text-[10px]">⏳</span>
                 ) : !canControl ? (
@@ -670,7 +659,6 @@ export function Room() {
                 <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏪</button>
                 <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏩</button>
                 <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">🔄</button>
-                <button onClick={handleFullscreen} className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⛶</button>
                 <span className="text-white/70 text-[11px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
                 <label className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer">
                   📁
@@ -753,7 +741,7 @@ export function Room() {
         >
           {chatExpanded ? (
             /* Expanded chat — full overlay */
-            <div className="h-full flex flex-col bg-gray-950/85 backdrop-blur-sm rounded-t-2xl overflow-hidden">
+            <div className="h-full flex flex-col bg-black/60 backdrop-blur-md rounded-t-2xl overflow-hidden">
               {/* Close button */}
               <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0">
                 <span className="text-gray-400 text-xs font-semibold">💬 Чат</span>
@@ -833,7 +821,7 @@ export function Room() {
             /* Peek — last 2 messages + tap to expand */
             <button
               onClick={() => setChatExpanded(true)}
-              className="w-full text-left bg-black/50 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
+              className="w-full text-left bg-black/30 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-white/60 text-xs">💬 Чат</span>
