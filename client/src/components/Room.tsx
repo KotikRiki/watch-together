@@ -475,8 +475,19 @@ export function Room() {
                   onClick={() => {
                     const newAd = !adPlaying;
                     setAdPlaying(newAd);
-                    if (newAd) socket?.emit("ad-started", code);
-                    else socket?.emit("ad-ended", code);
+                    if (newAd) {
+                      socket?.emit("ad-started", code);
+                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                      emitVideoAction("pause", time);
+                      setSyncAction({ action: "pause", time });
+                      setTimeout(() => setSyncAction(null), 300);
+                    } else {
+                      socket?.emit("ad-ended", code);
+                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                      emitVideoAction("play", time);
+                      setSyncAction({ action: "play", time });
+                      setTimeout(() => setSyncAction(null), 300);
+                    }
                   }}
                   className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${adPlaying ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
                 >
@@ -671,8 +682,19 @@ export function Room() {
                   onClick={() => {
                     const newAd = !adPlaying;
                     setAdPlaying(newAd);
-                    if (newAd) socket?.emit("ad-started", code);
-                    else socket?.emit("ad-ended", code);
+                    if (newAd) {
+                      socket?.emit("ad-started", code);
+                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                      emitVideoAction("pause", time);
+                      setSyncAction({ action: "pause", time });
+                      setTimeout(() => setSyncAction(null), 300);
+                    } else {
+                      socket?.emit("ad-ended", code);
+                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                      emitVideoAction("play", time);
+                      setSyncAction({ action: "play", time });
+                      setTimeout(() => setSyncAction(null), 300);
+                    }
                   }}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}
                 >
