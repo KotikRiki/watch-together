@@ -57,6 +57,8 @@ export function Room() {
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncFromActionRef = useRef(false);
   const lastExternalChangeRef = useRef(0);
+  const manualAdRef = useRef(false);
+  const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     playerStateRef.current = playerState;
@@ -175,6 +177,7 @@ export function Room() {
       off("reaction");
       off("watch-time-update");
       off("ad-state-changed");
+      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
     };
   }, [socket]);
 
@@ -411,6 +414,7 @@ export function Room() {
               onStateChange={(state) => setPlayerState(state)}
               onPlayerReady={() => setPlayerReady(true)}
               onAdStateChange={(isAd) => {
+                if (manualAdRef.current) return;
                 setAdPlaying(isAd);
                 if (isAd) socket?.emit("ad-started", code);
                 else socket?.emit("ad-ended", code);
@@ -479,6 +483,9 @@ export function Room() {
                 onClick={() => {
                   const newAd = !adPlaying;
                   setAdPlaying(newAd);
+                  manualAdRef.current = true;
+                  if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+                  manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
                   const time = videoPlayerRef.current?.getCurrentTime() || 0;
                   const action = newAd ? "pause" : "play";
                   emitVideoSync(action, time);
@@ -622,6 +629,7 @@ export function Room() {
             onStateChange={(state) => setPlayerState(state)}
             onPlayerReady={() => setPlayerReady(true)}
             onAdStateChange={(isAd) => {
+              if (manualAdRef.current) return;
               setAdPlaying(isAd);
               if (isAd) socket?.emit("ad-started", code);
               else socket?.emit("ad-ended", code);
@@ -677,6 +685,9 @@ export function Room() {
                   onClick={() => {
                     const newAd = !adPlaying;
                     setAdPlaying(newAd);
+                    manualAdRef.current = true;
+                    if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+                    manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
                     const time = videoPlayerRef.current?.getCurrentTime() || 0;
                     const action = newAd ? "pause" : "play";
                     emitVideoSync(action, time);
