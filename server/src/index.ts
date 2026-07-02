@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import { roomsRouter } from "./routes/rooms";
 import { uploadRouter, setupUploadServing } from "./routes/upload";
 import { adminRouter } from "./routes/admin";
+import { stickersRouter } from "./routes/stickers";
 import { setupSocketHandlers } from "./socket/handlers";
 import { initDB } from "./db/postgres";
 
@@ -29,6 +30,7 @@ app.use(express.json());
 app.use("/api/rooms", roomsRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/stickers", stickersRouter);
 setupUploadServing(app);
 
 const possiblePaths = [

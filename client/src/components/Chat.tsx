@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { StickerPanel } from "./StickerPanel";
 
 interface Message {
   id: string;
@@ -18,6 +19,7 @@ const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉
 
 export function Chat({ messages, onSendMessage, onReaction, username }: ChatProps) {
   const [input, setInput] = useState("");
+  const [showStickers, setShowStickers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,6 +41,11 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
     onReaction(emoji);
   };
 
+  const handleSendSticker = (url: string) => {
+    onSendMessage(`[sticker]${url}[/sticker]`);
+    setShowStickers(false);
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-900 rounded-lg">
       <div className="p-3 border-b border-gray-700">
@@ -57,19 +64,34 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
             }`}
           >
             <span className="text-xs text-gray-500 mb-0.5">{msg.author}</span>
-            <div
-              className={`px-3 py-1.5 rounded-lg max-w-[80%] text-sm ${
-                msg.author === username
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-white"
-              }`}
-            >
-              {msg.text}
-            </div>
+            {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
+              <img
+                src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
+                alt="sticker"
+                className="w-32 h-32 object-contain"
+              />
+            ) : (
+              <div
+                className={`px-3 py-1.5 rounded-lg max-w-[80%] text-sm ${
+                  msg.author === username
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 text-white"
+                }`}
+              >
+                {msg.text}
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
+
+      {showStickers && (
+        <StickerPanel
+          onSendSticker={handleSendSticker}
+          onClose={() => setShowStickers(false)}
+        />
+      )}
 
       <div className="p-2 border-t border-gray-700">
         <div className="flex gap-0.5 mb-2 justify-center flex-wrap">
@@ -87,6 +109,15 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
         </div>
 
         <form onSubmit={handleSubmit} className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowStickers(!showStickers)}
+            className={`text-xl px-2 rounded-lg shrink-0 transition-colors ${
+              showStickers ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            🎨
+          </button>
           <input
             type="text"
             value={input}
