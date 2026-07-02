@@ -55,6 +55,9 @@ export function Room() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSyncEventRef = useRef(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mobileVideoContainerRef = useRef<HTMLDivElement>(null);
+  const syncFromActionRef = useRef(false);
+  const syncingRef = useRef(false);
 
   useEffect(() => {
     playerStateRef.current = playerState;
@@ -99,8 +102,9 @@ export function Room() {
 
     on("video-sync", (data: { action: string; time: number; userId: string }) => {
       if (data.userId === socket?.id) return;
+      syncingRef.current = true;
       setSyncAction({ action: data.action, time: data.time });
-      setTimeout(() => setSyncAction(null), 300);
+      setTimeout(() => { setSyncAction(null); syncingRef.current = false; }, 300);
     });
 
     on("heartbeat", (data: { time: number; isPlaying: boolean; userId: string }) => {
@@ -299,7 +303,8 @@ export function Room() {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoAction(newAction, time);
     lastSyncEventRef.current = Date.now();
-    // Apply locally through syncAction for reliability
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: newAction, time });
     setTimeout(() => setSyncAction(null), 300);
   };
@@ -308,6 +313,8 @@ export function Room() {
     if (!canControl || adPlaying) return;
     emitVideoAction("seek", time);
     lastSyncEventRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: "seek", time });
     setTimeout(() => setSyncAction(null), 300);
   };
@@ -316,6 +323,8 @@ export function Room() {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoAction("seek", time);
     lastSyncEventRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: "seek", time });
     setTimeout(() => setSyncAction(null), 300);
   };
@@ -325,6 +334,23 @@ export function Room() {
     const newVal = !hostOnly;
     setHostOnly(newVal);
     socket?.emit("set-host-only", code, newVal);
+  };
+
+  const handleFullscreen = () => {
+    const el = mobileVideoContainerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen();
+    }
+  };
+
+  const handleExternalStateChange = (newState: "playing" | "paused") => {
+    if (syncFromActionRef.current) return;
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    emitVideoAction(newState === "playing" ? "play" : "pause", time);
+    lastSyncEventRef.current = Date.now();
   };
 
   if (!username) {
@@ -395,6 +421,7 @@ export function Room() {
                 if (isAd) socket?.emit("ad-started", code);
                 else socket?.emit("ad-ended", code);
               }}
+              onExternalStateChange={handleExternalStateChange}
               syncAction={syncAction}
             />
             {/* Emoji reactions */}
@@ -591,7 +618,7 @@ export function Room() {
       {/* Mobile layout — full-screen video + chat overlay */}
       <div className="lg:hidden fixed inset-0 bg-black flex flex-col" style={{ top: "52px" }}>
         {/* Video — full width, takes remaining space */}
-        <div className="relative flex-1 min-h-0">
+        <div ref={mobileVideoContainerRef} className="relative flex-1 min-h-0">
           <VideoPlayer
             ref={videoPlayerRef}
             videoUrl={videoUrl}
@@ -604,6 +631,7 @@ export function Room() {
               if (isAd) socket?.emit("ad-started", code);
               else socket?.emit("ad-ended", code);
             }}
+            onExternalStateChange={handleExternalStateChange}
             syncAction={syncAction}
           />
           {reactions.map((r) => (
@@ -622,14 +650,6 @@ export function Room() {
               {isHost && <span className="bg-yellow-500/80 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">👑 Хост</span>}
               {hostOnly && <span className="bg-orange-500/80 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">🔒</span>}
             </div>
-            {watchTimes.length > 0 && (
-              <div className="bg-black/60 backdrop-blur rounded-full px-2 py-0.5 flex items-center gap-1">
-                <span className="text-[10px]">⏱</span>
-                {watchTimes.map((wt, i) => (
-                  <span key={i} className="text-[10px] text-green-400 font-mono">{formatTime(wt.seconds)}</span>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Floating controls — bottom of video */}
@@ -650,7 +670,8 @@ export function Room() {
                 <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏪</button>
                 <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏩</button>
                 <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">🔄</button>
-                <span className="text-white/70 text-[11px] font-mono ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
+                <button onClick={handleFullscreen} className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⛶</button>
+                <span className="text-white/70 text-[11px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
                 <label className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer">
                   📁
                   <input type="file" accept=".mp4,.webm,.mkv,.avi,.mov,.ogg,.ogv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f); }} />
@@ -733,13 +754,16 @@ export function Room() {
           {chatExpanded ? (
             /* Expanded chat — full overlay */
             <div className="h-full flex flex-col bg-gray-950/85 backdrop-blur-sm rounded-t-2xl overflow-hidden">
-              {/* Drag handle */}
-              <button
-                onClick={() => setChatExpanded(false)}
-                className="flex justify-center pt-2 pb-1 shrink-0"
-              >
-                <div className="w-10 h-1 bg-gray-600 rounded-full" />
-              </button>
+              {/* Close button */}
+              <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0">
+                <span className="text-gray-400 text-xs font-semibold">💬 Чат</span>
+                <button
+                  onClick={() => setChatExpanded(false)}
+                  className="w-7 h-7 rounded-full bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center text-sm"
+                >
+                  ✕
+                </button>
+              </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-3 pb-2 min-h-0">

@@ -14,6 +14,7 @@ interface VideoPlayerProps {
   onStateChange?: (state: "playing" | "paused" | "ended") => void;
   onPlayerReady?: () => void;
   onAdStateChange?: (isAd: boolean) => void;
+  onExternalStateChange?: (state: "playing" | "paused") => void;
   syncAction: { action: string; time: number } | null;
 }
 
@@ -39,7 +40,7 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, syncAction }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,6 +49,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
     const adPlayingRef = useRef(false);
+    const syncActiveRef = useRef(false);
 
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
@@ -58,8 +60,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       const vid = videoRef.current;
       if (!vid) return;
 
-      const onPlay = () => { onStateChange?.("playing"); };
-      const onPause = () => { onStateChange?.("paused"); };
+      const onPlay = () => { onStateChange?.("playing"); if (!syncActiveRef.current) onExternalStateChange?.("playing"); };
+      const onPause = () => { onStateChange?.("paused"); if (!syncActiveRef.current) onExternalStateChange?.("paused"); };
       const onEnded = () => { onStateChange?.("ended"); };
       const onTime = () => { currentTimeRef.current = vid.currentTime; };
       const onCanPlay = () => {
@@ -115,7 +117,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           height: "100%",
           width: "100%",
           videoId: videoInfo.id,
-          playerVars: { autoplay: 0, controls: 1, modestbranding: 1, rel: 0 },
+          playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0, disablekb: 1 },
           events: {
             onReady: () => {
               if (!destroyed) {
@@ -175,8 +177,10 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
               if (e.data === window.YT.PlayerState.PLAYING) {
                 onStateChange?.("playing");
+                if (!syncActiveRef.current) onExternalStateChange?.("playing");
               } else if (e.data === window.YT.PlayerState.PAUSED) {
                 onStateChange?.("paused");
+                if (!syncActiveRef.current) onExternalStateChange?.("paused");
               } else if (e.data === window.YT.PlayerState.ENDED) {
                 onStateChange?.("ended");
               }
@@ -261,6 +265,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // Handle sync action from peer
     useEffect(() => {
       if (!syncAction) return;
+      syncActiveRef.current = true;
+      setTimeout(() => { syncActiveRef.current = false; }, 500);
       if (syncAction.action === "play") {
         if (isFile) videoRef.current?.play();
         else {
@@ -369,7 +375,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     const getSrc = () => {
       switch (videoInfo.type) {
         case "youtube":
-          return `https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=1&modestbranding=1&rel=0`;
+          return `https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&disablekb=1`;
         case "rutube":
           return `https://rutube.ru/play/embed/${videoInfo.id}`;
         case "vk":
