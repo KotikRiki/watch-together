@@ -25,30 +25,6 @@ const STICKER_PACKS = [
   { name: "by_adel_strimy_ot_ksyuni_chb_archiveADelka_fe0d_by_offstikbot", label: "Адель" },
 ];
 
-function StickerThumb({ sticker }: { sticker: Sticker }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  return (
-    <div className="relative w-full h-full">
-      <span className="absolute inset-0 flex items-center justify-center text-3xl select-none pointer-events-none">
-        {sticker.emoji}
-      </span>
-      {!failed && (sticker.is_video || sticker.is_animated) && (
-        <video
-          src={sticker.url}
-          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-          muted
-          playsInline
-          preload="metadata"
-          onLoadedData={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-        />
-      )}
-    </div>
-  );
-}
-
 export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
   const [packs, setPacks] = useState<Record<string, StickerPack>>({});
   const [activePack, setActivePack] = useState(STICKER_PACKS[0].name);
@@ -78,7 +54,6 @@ export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
 
   return (
     <div className="bg-gray-900 border-t border-gray-700">
-      {/* Pack tabs */}
       <div className="flex gap-1 p-2 border-b border-gray-700">
         {STICKER_PACKS.map((p) => (
           <button
@@ -101,7 +76,6 @@ export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
         </button>
       </div>
 
-      {/* Stickers grid */}
       <div className="p-2 max-h-60 overflow-y-auto">
         {loading ? (
           <p className="text-gray-500 text-xs text-center py-4">Загрузка...</p>
@@ -113,9 +87,9 @@ export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
               <button
                 key={sticker.file_id}
                 onClick={() => onSendSticker(sticker.url)}
-                className="aspect-square rounded-lg overflow-hidden bg-gray-800 hover:bg-gray-700 active:scale-95 transition-all"
+                className="aspect-square rounded-lg bg-gray-800 hover:bg-gray-700 active:scale-95 transition-all flex items-center justify-center"
               >
-                <StickerThumb sticker={sticker} />
+                <span className="text-3xl select-none pointer-events-none">{sticker.emoji}</span>
               </button>
             ))}
           </div>

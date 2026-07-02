@@ -885,7 +885,8 @@ export function Room() {
               </div>
               {messages.slice(-2).map((msg, i) => (
                 <div key={msg.id || i} className="text-white/80 text-xs truncate">
-                  <span className="text-blue-400 font-medium">{msg.author}:</span> {msg.text}
+                  <span className="text-blue-400 font-medium">{msg.author}:</span>{" "}
+                  {msg.text.startsWith("[sticker]") ? "🖼 стикер" : msg.text}
                 </div>
               ))}
               {messages.length === 0 && (
