@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { getDB, generateId, saveDB } from "../db/sqlite";
+import { query, generateId } from "../db/postgres";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -28,30 +28,25 @@ const upload = multer({
 
 export const uploadRouter = Router();
 
-uploadRouter.post("/", upload.single("video"), (req, res) => {
+uploadRouter.post("/", upload.single("video"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
 
   const filename = req.file.filename;
   const url = `/uploads/${filename}`;
   const roomCode = req.body.roomCode as string;
+  const username = req.body.username as string;
 
-  const db = getDB();
   let roomId: string | null = null;
   if (roomCode) {
-    const room = db.rooms.find((r: any) => r.code === roomCode);
-    if (room) roomId = room.id;
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+    if (roomResult.rows.length > 0) roomId = roomResult.rows[0].id;
   }
 
-  db.uploads.push({
-    id: generateId(),
-    roomId,
-    filename,
-    originalName: req.file.originalname,
-    size: req.file.size,
-    uploadedBy: req.body.username || null,
-    createdAt: new Date().toISOString(),
-  });
-  saveDB();
+  const id = generateId();
+  await query(
+    "INSERT INTO uploads (id, room_id, filename, original_name, size, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6)",
+    [id, roomId, filename, req.file.originalname, req.file.size, username || null]
+  );
 
   res.json({
     url,

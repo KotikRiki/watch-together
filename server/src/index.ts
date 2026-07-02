@@ -8,7 +8,7 @@ import { roomsRouter } from "./routes/rooms";
 import { uploadRouter, setupUploadServing } from "./routes/upload";
 import { adminRouter } from "./routes/admin";
 import { setupSocketHandlers } from "./socket/handlers";
-import { initDB } from "./db/sqlite";
+import { initDB } from "./db/postgres";
 
 const app = express();
 const server = createServer(app);
@@ -24,29 +24,13 @@ app.use("/api/upload", uploadRouter);
 app.use("/api/admin", adminRouter);
 setupUploadServing(app);
 
-// On Render: cwd=server, client at ../client/dist
-// On cPanel: cwd=public_html/app, client at client/dist
-// Local dev: cwd=server, client at ../client/dist
 const possiblePaths = [
   path.join(process.cwd(), "../client/dist"),
   path.join(process.cwd(), "client/dist"),
   path.join(__dirname, "../../client/dist"),
   path.join(__dirname, "../client/dist"),
 ];
-console.log("CWD:", process.cwd());
-console.log("__dirname:", __dirname);
-console.log("Possible client paths:", possiblePaths.map(p => ({ path: p, exists: fs.existsSync(path.join(p, "index.html")) })));
 const clientPath = possiblePaths.find(p => fs.existsSync(path.join(p, "index.html"))) || possiblePaths[0];
-console.log("Using clientPath:", clientPath);
-
-app.get("/debug-paths", (_req, res) => {
-  res.json({
-    cwd: process.cwd(),
-    dirname: __dirname,
-    paths: possiblePaths.map(p => ({ path: p, indexExists: fs.existsSync(path.join(p, "index.html")), dirExists: fs.existsSync(p) })),
-    clientPath,
-  });
-});
 
 app.use(express.static(clientPath));
 

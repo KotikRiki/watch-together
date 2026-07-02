@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getDB, generateId, saveDB } from "../db/sqlite";
+import { query, generateId } from "../db/postgres";
 
 export const roomsRouter = Router();
 
@@ -7,60 +7,88 @@ function generateCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-roomsRouter.post("/", (req, res) => {
+roomsRouter.post("/", async (req, res) => {
   try {
     const { videoUrl } = req.body;
     const code = generateCode();
     const id = generateId();
-    const db = getDB();
-    db.rooms.push({ id, code, videoUrl: videoUrl || null, createdAt: new Date().toISOString() });
-    saveDB();
+    await query(
+      "INSERT INTO rooms (id, code, video_url) VALUES ($1, $2, $3)",
+      [id, code, videoUrl || null]
+    );
     res.json({ id, code, videoUrl: videoUrl || null });
   } catch (error) {
+    console.error("Failed to create room:", error);
     res.status(500).json({ error: "Failed to create room" });
   }
 });
 
-roomsRouter.get("/:code", (req, res) => {
+roomsRouter.get("/:code", async (req, res) => {
   try {
     const { code } = req.params;
-    const db = getDB();
-    const room = db.rooms.find((r: any) => r.code === code);
-    if (!room) return res.status(404).json({ error: "Room not found" });
-    const messages = db.messages.filter((m: any) => m.roomId === room.id).slice(-50);
-    const queue = db.queue.filter((q: any) => q.roomId === room.id).sort((a: any, b: any) => a.order - b.order);
-    res.json({ ...room, messages, queue });
+    const roomResult = await query("SELECT * FROM rooms WHERE code = $1", [code]);
+    if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+    const room = roomResult.rows[0];
+
+    const messagesResult = await query(
+      "SELECT * FROM messages WHERE room_id = $1 ORDER BY created_at ASC LIMIT 200",
+      [room.id]
+    );
+    const queueResult = await query(
+      "SELECT id, room_id, url, title, sort_order as \"order\" FROM queue WHERE room_id = $1 ORDER BY sort_order",
+      [room.id]
+    );
+
+    res.json({
+      id: room.id,
+      code: room.code,
+      videoUrl: room.video_url,
+      views: room.views,
+      totalMessages: room.total_messages,
+      createdAt: room.created_at,
+      lastActive: room.last_active,
+      messages: messagesResult.rows,
+      queue: queueResult.rows,
+    });
   } catch (error) {
+    console.error("Failed to get room:", error);
     res.status(500).json({ error: "Failed to get room" });
   }
 });
 
-roomsRouter.post("/:code/queue", (req, res) => {
+roomsRouter.post("/:code/queue", async (req, res) => {
   try {
     const { code } = req.params;
     const { url, title } = req.body;
-    const db = getDB();
-    const room = db.rooms.find((r: any) => r.code === code);
-    if (!room) return res.status(404).json({ error: "Room not found" });
-    const existing = db.queue.filter((q: any) => q.roomId === room.id);
-    const maxOrder = existing.reduce((max: number, q: any) => Math.max(max, q.order), -1);
-    const item = { id: generateId(), roomId: room.id, url, title: title || null, order: maxOrder + 1 };
-    db.queue.push(item);
-    saveDB();
-    res.json(item);
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [code]);
+    if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+    const roomId = roomResult.rows[0].id;
+
+    const maxResult = await query(
+      "SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM queue WHERE room_id = $1",
+      [roomId]
+    );
+    const nextOrder = maxResult.rows[0].next_order;
+    const id = generateId();
+
+    await query(
+      "INSERT INTO queue (id, room_id, url, title, sort_order) VALUES ($1, $2, $3, $4, $5)",
+      [id, roomId, url, title || null, nextOrder]
+    );
+    res.json({ id, roomId, url, title: title || null, order: nextOrder });
   } catch (error) {
+    console.error("Failed to add to queue:", error);
     res.status(500).json({ error: "Failed to add to queue" });
   }
 });
 
-roomsRouter.delete("/:code/queue/:itemId", (req, res) => {
+roomsRouter.delete("/:code/queue/:itemId", async (req, res) => {
   try {
     const { itemId } = req.params;
-    const db = getDB();
-    db.queue = db.queue.filter((q: any) => q.id !== itemId);
-    saveDB();
+    await query("DELETE FROM queue WHERE id = $1", [itemId]);
     res.json({ success: true });
   } catch (error) {
+    console.error("Failed to remove from queue:", error);
     res.status(500).json({ error: "Failed to remove from queue" });
   }
 });

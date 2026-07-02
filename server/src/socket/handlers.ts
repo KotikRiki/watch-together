@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io";
-import { getDB, generateId, saveDB } from "../db/sqlite";
+import { query, generateId } from "../db/postgres";
 
 interface RoomState {
   videoUrl: string | null;
@@ -7,6 +7,7 @@ interface RoomState {
   isPlaying: boolean;
   currentTime: number;
   users: Set<string>;
+  usernames: Map<string, string>;
   hostSocketId: string | null;
   hostOnly: boolean;
   lastSyncTime: number;
@@ -19,18 +20,19 @@ export function setupSocketHandlers(io: Server) {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("join-room", (roomCode: string, username: string) => {
+    socket.on("join-room", async (roomCode: string, username: string) => {
       socket.join(roomCode);
 
       if (!rooms.has(roomCode)) {
-        const db = getDB();
-        const room = db.rooms.find((r: any) => r.code === roomCode);
+        const result = await query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
+        const videoUrl = result.rows[0]?.video_url || null;
         rooms.set(roomCode, {
-          videoUrl: room?.videoUrl || null,
+          videoUrl,
           videoType: "embed",
           isPlaying: false,
           currentTime: 0,
           users: new Set(),
+          usernames: new Map(),
           hostSocketId: null,
           hostOnly: false,
           lastSyncTime: 0,
@@ -41,19 +43,17 @@ export function setupSocketHandlers(io: Server) {
       const roomState = rooms.get(roomCode)!;
       const isFirstUser = roomState.users.size === 0;
       roomState.users.add(socket.id);
+      roomState.usernames.set(socket.id, username);
 
       if (isFirstUser) {
         roomState.hostSocketId = socket.id;
         socket.emit("host-changed", { isHost: true });
       }
 
-      const db = getDB();
-      const dbRoom = db.rooms.find((r: any) => r.code === roomCode);
-      if (dbRoom) {
-        dbRoom.views = (dbRoom.views || 0) + 1;
-        dbRoom.lastActive = new Date().toISOString();
-        saveDB();
-      }
+      await query(
+        "UPDATE rooms SET views = views + 1, last_active = NOW() WHERE code = $1",
+        [roomCode]
+      );
 
       socket.emit("room-state", {
         videoUrl: roomState.videoUrl,
@@ -65,19 +65,34 @@ export function setupSocketHandlers(io: Server) {
       io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
     });
 
-    socket.on("change-video", (roomCode: string, videoUrl: string, videoType: string) => {
+    socket.on("change-video", async (roomCode: string, videoUrl: string, videoType: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
       if (roomState.hostOnly && roomState.hostSocketId !== socket.id) return;
+
+      const changedBy = roomState.usernames.get(socket.id) || "unknown";
+
+      const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+      if (roomResult.rows.length > 0) {
+        const roomId = roomResult.rows[0].id;
+
+        if (roomState.videoUrl) {
+          await query(
+            "INSERT INTO video_history (room_id, url, changed_by) VALUES ($1, $2, $3)",
+            [roomId, roomState.videoUrl, changedBy]
+          );
+        }
+
+        await query(
+          "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE code = $2",
+          [videoUrl, roomCode]
+        );
+      }
 
       roomState.videoUrl = videoUrl;
       roomState.videoType = videoType === "file" ? "file" : "embed";
       roomState.currentTime = 0;
       roomState.isPlaying = false;
-
-      const db = getDB();
-      const room = db.rooms.find((r: any) => r.code === roomCode);
-      if (room) { room.videoUrl = videoUrl; saveDB(); }
 
       io.to(roomCode).emit("video-changed", { videoUrl, videoType: roomState.videoType });
     });
@@ -121,30 +136,38 @@ export function setupSocketHandlers(io: Server) {
       io.to(roomCode).emit("host-only-changed", { hostOnly });
     });
 
-    socket.on("chat-message", (roomCode: string, message: { author: string; text: string }) => {
-      const db = getDB();
-      let room = db.rooms.find((r: any) => r.code === roomCode);
+    socket.on("chat-message", async (roomCode: string, message: { author: string; text: string }) => {
+      let roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
       let roomId: string;
 
-      if (!room) {
+      if (roomResult.rows.length === 0) {
         roomId = generateId();
-        db.rooms.push({ id: roomId, code: roomCode, videoUrl: null, createdAt: new Date().toISOString() });
+        await query(
+          "INSERT INTO rooms (id, code, video_url) VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
+          [roomId, roomCode]
+        );
       } else {
-        roomId = room.id;
+        roomId = roomResult.rows[0].id;
       }
 
       const msgId = generateId();
-      const msg = { id: msgId, roomId, author: message.author, text: message.text, createdAt: new Date().toISOString() };
-      db.messages.push(msg);
+      await query(
+        "INSERT INTO messages (id, room_id, author, text) VALUES ($1, $2, $3, $4)",
+        [msgId, roomId, message.author, message.text]
+      );
 
-      const dbRoom = db.rooms.find((r: any) => r.id === roomId);
-      if (dbRoom) {
-        dbRoom.totalMessages = (dbRoom.totalMessages || 0) + 1;
-        dbRoom.lastActive = new Date().toISOString();
-      }
-      saveDB();
+      await query(
+        "UPDATE rooms SET total_messages = total_messages + 1, last_active = NOW() WHERE id = $1",
+        [roomId]
+      );
 
-      io.to(roomCode).emit("new-message", msg);
+      io.to(roomCode).emit("new-message", {
+        id: msgId,
+        roomId,
+        author: message.author,
+        text: message.text,
+        createdAt: new Date().toISOString(),
+      });
     });
 
     socket.on("emoji-reaction", (roomCode: string, emoji: string) => {
@@ -172,6 +195,7 @@ export function setupSocketHandlers(io: Server) {
       rooms.forEach((roomState, roomCode) => {
         if (roomState.users.has(socket.id)) {
           roomState.users.delete(socket.id);
+          roomState.usernames.delete(socket.id);
           roomState.userTimes.delete(socket.id);
           io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
           const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
@@ -187,4 +211,18 @@ export function setupSocketHandlers(io: Server) {
       });
     });
   });
+}
+
+export function getActiveRooms() {
+  const active: { code: string; users: number; videoUrl: string | null }[] = [];
+  rooms.forEach((state, code) => {
+    active.push({ code, users: state.users.size, videoUrl: state.videoUrl });
+  });
+  return active;
+}
+
+export function getActiveUserCount() {
+  let count = 0;
+  rooms.forEach((state) => { count += state.users.size; });
+  return count;
 }
