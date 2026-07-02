@@ -13,6 +13,7 @@ interface VideoPlayerProps {
   onTimeUpdate: (time: number) => void;
   onStateChange?: (state: "playing" | "paused" | "ended") => void;
   onPlayerReady?: () => void;
+  onAdStateChange?: (isAd: boolean) => void;
   syncAction: { action: string; time: number } | null;
 }
 
@@ -38,7 +39,7 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, syncAction }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,6 +47,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     const vkPlayerRef = useRef<any>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
+    const adPlayingRef = useRef(false);
 
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
@@ -121,6 +123,29 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             },
             onStateChange: (e: any) => {
               if (destroyed) return;
+
+              // Detect YouTube ads
+              // YouTube ads: state is PLAYING but getVideoData().video_id differs from main video
+              // or player is in ad mode (adPlaying flag in YT API)
+              try {
+                const playerState = e.data;
+                const isYTAdPlaying = ytPlayerRef.current?.getAdPlaying?.() || false;
+                const videoData = ytPlayerRef.current?.getVideoData?.() || {};
+                const isDifferentVideo = videoData.video_id && videoInfo && videoData.video_id !== videoInfo.id;
+
+                const isAd = isYTAdPlaying || isDifferentVideo || (playerState === window.YT.PlayerState.PLAYING && currentTimeRef.current === 0 && adPlayingRef.current);
+
+                if (isAd !== adPlayingRef.current) {
+                  adPlayingRef.current = isAd;
+                  onAdStateChange?.(isAd);
+                }
+
+                // Track if we were paused then jumped to playing at time 0 (likely ad)
+                if (playerState === window.YT.PlayerState.PLAYING && currentTimeRef.current > 0.5) {
+                  adPlayingRef.current = false;
+                }
+              } catch {}
+
               if (e.data === window.YT.PlayerState.PLAYING) {
                 onStateChange?.("playing");
               } else if (e.data === window.YT.PlayerState.PAUSED) {

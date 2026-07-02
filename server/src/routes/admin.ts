@@ -278,6 +278,58 @@ adminRouter.get("/video-history", async (req, res) => {
   }
 });
 
+adminRouter.get("/watch-time", async (req, res) => {
+  try {
+    const groupBy = req.query.groupBy as string || "video";
+    const roomId = req.query.roomId as string;
+
+    if (groupBy === "user") {
+      let where = "1=1";
+      let params: any[] = [];
+      let paramIdx = 1;
+      if (roomId) { where += ` AND ws.room_id = $${paramIdx++}`; params.push(roomId); }
+      const result = await query(
+        `SELECT ws.username, SUM(ws.watched_seconds) as "totalSeconds", COUNT(*)::int as "sessions",
+         COUNT(DISTINCT ws.video_url)::int as "videos"
+         FROM watch_sessions ws WHERE ${where} GROUP BY ws.username ORDER BY "totalSeconds" DESC`,
+        params
+      );
+      res.json({ users: result.rows });
+    } else if (groupBy === "video") {
+      let where = "1=1";
+      let params: any[] = [];
+      let paramIdx = 1;
+      if (roomId) { where += ` AND ws.room_id = $${paramIdx++}`; params.push(roomId); }
+      const result = await query(
+        `SELECT ws.video_url, SUM(ws.watched_seconds) as "totalSeconds", COUNT(*)::int as "sessions",
+         COUNT(DISTINCT ws.username)::int as "uniqueUsers"
+         FROM watch_sessions ws WHERE ${where} GROUP BY ws.video_url ORDER BY "totalSeconds" DESC LIMIT 50`,
+        params
+      );
+      res.json({ videos: result.rows });
+    } else if (groupBy === "detail") {
+      let where = "1=1";
+      let params: any[] = [];
+      let paramIdx = 1;
+      if (roomId) { where += ` AND ws.room_id = $${paramIdx++}`; params.push(roomId); }
+      const result = await query(
+        `SELECT ws.*, r.code as "roomCode" FROM watch_sessions ws
+         LEFT JOIN rooms r ON r.id = ws.room_id
+         WHERE ${where} ORDER BY ws.ended_at DESC LIMIT 200`,
+        params
+      );
+      const totalResult = await query(
+        `SELECT SUM(watched_seconds) as "totalSeconds" FROM watch_sessions ws WHERE ${where}`,
+        params
+      );
+      res.json({ sessions: result.rows, totalSeconds: parseInt(totalResult.rows[0]?.totalSeconds) || 0 });
+    }
+  } catch (error) {
+    console.error("Watch time error:", error);
+    res.status(500).json({ error: "Failed to get watch time" });
+  }
+});
+
 adminRouter.post("/reset", async (req, res) => {
   try {
     const confirm = req.headers["x-confirm-reset"];
@@ -301,6 +353,9 @@ adminRouter.post("/reset", async (req, res) => {
     }
     if (what === "all" || what === "video_history") {
       await query("DELETE FROM video_history");
+    }
+    if (what === "all" || what === "watch_sessions") {
+      await query("DELETE FROM watch_sessions");
     }
 
     res.json({ success: true, reset: what });

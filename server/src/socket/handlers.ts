@@ -12,9 +12,29 @@ interface RoomState {
   hostOnly: boolean;
   lastSyncTime: number;
   userTimes: Map<string, { time: number; isPlaying: boolean; username: string }>;
+  watchAccumulator: Map<string, number>;
 }
 
 const rooms = new Map<string, RoomState>();
+
+async function flushWatchTime(roomCode: string) {
+  const roomState = rooms.get(roomCode);
+  if (!roomState || !roomState.videoUrl) return;
+
+  const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+  if (roomResult.rows.length === 0) return;
+  const roomId = roomResult.rows[0].id;
+
+  for (const [username, seconds] of roomState.watchAccumulator) {
+    if (seconds <= 0) continue;
+    await query(
+      `INSERT INTO watch_sessions (room_id, video_url, username, watched_seconds)
+       VALUES ($1, $2, $3, $4)`,
+      [roomId, roomState.videoUrl, username, seconds]
+    );
+  }
+  roomState.watchAccumulator.clear();
+}
 
 export function setupSocketHandlers(io: Server) {
   io.on("connection", (socket) => {
@@ -37,6 +57,7 @@ export function setupSocketHandlers(io: Server) {
           hostOnly: false,
           lastSyncTime: 0,
           userTimes: new Map(),
+          watchAccumulator: new Map(),
         });
       }
 
@@ -71,6 +92,8 @@ export function setupSocketHandlers(io: Server) {
       if (roomState.hostOnly && roomState.hostSocketId !== socket.id) return;
 
       const changedBy = roomState.usernames.get(socket.id) || "unknown";
+
+      await flushWatchTime(roomCode);
 
       const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
       if (roomResult.rows.length > 0) {
@@ -122,6 +145,16 @@ export function setupSocketHandlers(io: Server) {
     socket.on("user-time", (roomCode: string, time: number, isPlaying: boolean, username: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
+
+      const prev = roomState.userTimes.get(socket.id);
+      if (prev && prev.isPlaying && isPlaying && roomState.videoUrl) {
+        const delta = Math.abs(time - prev.time);
+        if (delta > 0 && delta < 10) {
+          const current = roomState.watchAccumulator.get(username) || 0;
+          roomState.watchAccumulator.set(username, current + delta);
+        }
+      }
+
       roomState.userTimes.set(socket.id, { time, isPlaying, username });
       const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
       roomState.userTimes.forEach((val) => timesArray.push(val));
@@ -134,6 +167,31 @@ export function setupSocketHandlers(io: Server) {
       if (roomState.hostSocketId !== socket.id) return;
       roomState.hostOnly = hostOnly;
       io.to(roomCode).emit("host-only-changed", { hostOnly });
+    });
+
+    socket.on("get-watch-time", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+      const watchTimes: { username: string; seconds: number }[] = [];
+      roomState.watchAccumulator.forEach((seconds, username) => {
+        watchTimes.push({ username, seconds });
+      });
+      socket.emit("watch-time-update", { watchTimes, videoUrl: roomState.videoUrl });
+    });
+
+    socket.on("ad-started", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+      // Only host can trigger ad state
+      if (roomState.hostSocketId !== socket.id) return;
+      socket.to(roomCode).emit("ad-state-changed", { isAd: true });
+    });
+
+    socket.on("ad-ended", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+      if (roomState.hostSocketId !== socket.id) return;
+      socket.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string }) => {
@@ -190,13 +248,17 @@ export function setupSocketHandlers(io: Server) {
       socket.to(roomCode).emit("call-ended");
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
       console.log("User disconnected:", socket.id);
-      rooms.forEach((roomState, roomCode) => {
+      for (const [roomCode, roomState] of rooms) {
         if (roomState.users.has(socket.id)) {
+          const username = roomState.usernames.get(socket.id) || "unknown";
           roomState.users.delete(socket.id);
           roomState.usernames.delete(socket.id);
           roomState.userTimes.delete(socket.id);
+
+          await flushWatchTime(roomCode);
+
           io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
           const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
           roomState.userTimes.forEach((val) => timesArray.push(val));
@@ -208,10 +270,17 @@ export function setupSocketHandlers(io: Server) {
           }
           if (roomState.users.size === 0) rooms.delete(roomCode);
         }
-      });
+      }
     });
   });
 }
+
+// Flush all watch time every 60 seconds
+setInterval(() => {
+  rooms.forEach((_state, roomCode) => {
+    flushWatchTime(roomCode);
+  });
+}, 60000);
 
 export function getActiveRooms() {
   const active: { code: string; users: number; videoUrl: string | null }[] = [];

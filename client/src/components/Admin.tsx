@@ -40,7 +40,7 @@ interface VideoHistoryItem {
   created_at: string; roomCode?: string;
 }
 
-type Tab = "stats" | "rooms" | "history" | "videoHistory" | "system";
+type Tab = "stats" | "rooms" | "history" | "videoHistory" | "watchTime" | "system";
 
 export function Admin() {
   const [auth, setAuth] = useState<string | null>(() => localStorage.getItem("wt_admin_auth"));
@@ -70,6 +70,8 @@ export function Admin() {
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetWhat, setResetWhat] = useState("all");
   const [toast, setToast] = useState("");
+  const [watchTimeGroup, setWatchTimeGroup] = useState<"video" | "user" | "detail">("video");
+  const [watchTimeData, setWatchTimeData] = useState<any>(null);
 
   const headers: Record<string, string> = auth ? { Authorization: `Basic ${auth}` } : {};
 
@@ -124,6 +126,18 @@ export function Admin() {
     setLoading(false);
   }, [auth, messagesPage, filterRoom, msgAuthor, msgSearch]);
 
+  const fetchWatchTime = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ groupBy: watchTimeGroup });
+      if (filterRoom) params.set("roomId", filterRoom);
+      const r = await fetch(`/api/admin/watch-time?${params}`, { headers });
+      if (r.ok) setWatchTimeData(await r.json());
+      else if (r.status === 401) logout();
+    } catch {}
+    setLoading(false);
+  }, [auth, watchTimeGroup, filterRoom]);
+
   const fetchVideoHistory = useCallback(async () => {
     setLoading(true);
     try {
@@ -170,6 +184,7 @@ export function Admin() {
     if (tab === "rooms") fetchRooms();
     if (tab === "history") fetchHistory();
     if (tab === "videoHistory") fetchVideoHistory();
+    if (tab === "watchTime") fetchWatchTime();
     if (tab === "system") fetchSystem();
   }, [auth, tab]);
 
@@ -187,6 +202,11 @@ export function Admin() {
     if (!auth || tab !== "videoHistory") return;
     fetchVideoHistory();
   }, [vhPage, filterRoom]);
+
+  useEffect(() => {
+    if (!auth || tab !== "watchTime") return;
+    fetchWatchTime();
+  }, [watchTimeGroup, filterRoom]);
 
   useEffect(() => {
     if (!auth || tab !== "system") return;
@@ -216,6 +236,7 @@ export function Admin() {
     { id: "rooms", label: "🏠 Комнаты" },
     { id: "history", label: "💬 Сообщения" },
     { id: "videoHistory", label: "🎬 Видео" },
+    { id: "watchTime", label: "⏱ Время" },
     { id: "system", label: "🖥 Сервер" },
   ];
 
@@ -426,6 +447,79 @@ export function Admin() {
           </div>
         )}
 
+        {/* === WATCH TIME === */}
+        {tab === "watchTime" && (
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              {(["video", "user", "detail"] as const).map((g) => (
+                <button key={g} onClick={() => { setWatchTimeGroup(g); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    watchTimeGroup === g ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}>
+                  {g === "video" ? "По видео" : g === "user" ? "По пользователям" : "Детали"}
+                </button>
+              ))}
+              <input type="text" placeholder="Room ID..." value={filterRoom}
+                onChange={(e) => setFilterRoom(e.target.value)}
+                className="bg-gray-800 text-white rounded-lg px-3 py-2 text-sm w-32" />
+            </div>
+
+            {watchTimeData && watchTimeGroup === "video" && watchTimeData.videos && (
+              <div className="space-y-2">
+                <h3 className="text-white font-semibold">Время просмотра по видео</h3>
+                {watchTimeData.videos.length === 0 && <p className="text-gray-600 text-sm">Нет данных</p>}
+                {watchTimeData.videos.map((v: any, i: number) => (
+                  <div key={i} className="bg-gray-900 rounded-lg p-3 border border-gray-800">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-gray-400 text-xs">#{i + 1}</span>
+                      <span className="text-green-400 font-bold">{fmtDuration(v.totalSeconds)}</span>
+                    </div>
+                    <p className="text-gray-300 text-xs truncate mb-1">{v.videoUrl}</p>
+                    <div className="flex gap-3 text-xs text-gray-500">
+                      <span>{v.uniqueUsers} юзеров</span>
+                      <span>{v.sessions} сессий</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {watchTimeData && watchTimeGroup === "user" && watchTimeData.users && (
+              <div className="space-y-2">
+                <h3 className="text-white font-semibold">Время просмотра по пользователям</h3>
+                {watchTimeData.users.length === 0 && <p className="text-gray-600 text-sm">Нет данных</p>}
+                {watchTimeData.users.map((u: any, i: number) => (
+                  <div key={i} className="bg-gray-900 rounded-lg p-3 border border-gray-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-blue-400 font-semibold">{u.username}</span>
+                      <span className="text-gray-500 text-xs ml-2">{u.videos} видео, {u.sessions} сессий</span>
+                    </div>
+                    <span className="text-green-400 font-bold">{fmtDuration(u.totalSeconds)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {watchTimeData && watchTimeGroup === "detail" && watchTimeData.sessions && (
+              <div className="space-y-2">
+                <p className="text-gray-500 text-xs">Всего: {fmtDuration(watchTimeData.totalSeconds)}</p>
+                {watchTimeData.sessions.length === 0 && <p className="text-gray-600 text-sm">Нет данных</p>}
+                {watchTimeData.sessions.map((s: any) => (
+                  <div key={s.id} className="bg-gray-900 rounded-lg p-2 border border-gray-800 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-400">{s.username}</span>
+                      <span className="text-green-400 font-bold">{fmtDuration(s.watched_seconds)}</span>
+                      <span className="text-gray-500 font-mono text-xs">{s.roomCode || s.room_id}</span>
+                      <span className="text-gray-600 text-xs ml-auto">{new Date(s.ended_at).toLocaleString()}</span>
+                    </div>
+                    <p className="text-gray-500 text-xs truncate mt-0.5">{s.video_url}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* === SYSTEM === */}
         {tab === "system" && systemInfo && (
           <div className="space-y-4">
@@ -517,6 +611,7 @@ export function Admin() {
                 { value: "uploads", label: "Все загрузки" },
                 { value: "queue", label: "Все очереди" },
                 { value: "video_history", label: "Историю видео" },
+                { value: "watch_sessions", label: "Время просмотра" },
               ].map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 cursor-pointer text-sm">
                   <input type="radio" name="resetWhat" value={opt.value} checked={resetWhat === opt.value}
@@ -571,4 +666,14 @@ function fmtUptime(seconds: number): string {
   if (d > 0) return `${d}d ${h}h ${m}m`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+function fmtDuration(seconds: number): string {
+  if (!seconds) return "0с";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}ч ${m}м ${s}с`;
+  if (m > 0) return `${m}м ${s}с`;
+  return `${s}с`;
 }
