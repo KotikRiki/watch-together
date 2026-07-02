@@ -65,22 +65,14 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
           >
             <span className="text-xs text-gray-500 mb-0.5">{msg.author}</span>
             {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
-              msg.text.replace("[sticker]", "").replace("[/sticker]", "").endsWith(".webm") ? (
-                <video
-                  src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
-                  className="w-32 h-32 object-contain"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
-                  alt="sticker"
-                  className="w-32 h-32 object-contain"
-                />
-              )
+              <video
+                src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
+                className="w-32 h-32 object-contain"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
             ) : (
               <div
                 className={`px-3 py-1.5 rounded-lg max-w-[80%] text-sm ${

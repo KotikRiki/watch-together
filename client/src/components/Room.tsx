@@ -4,6 +4,7 @@ import { useSocket } from "../hooks/useSocket";
 import { VideoPlayer } from "./VideoPlayer";
 import type { VideoPlayerHandle } from "./VideoPlayer";
 import { Chat } from "./Chat";
+import { StickerPanel } from "./StickerPanel";
 import { Queue } from "./Queue";
 
 interface Message {
@@ -39,6 +40,7 @@ export function Room() {
   const [syncAction, setSyncAction] = useState<{ action: string; time: number } | null>(null);
   const [showCall, setShowCall] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
+  const [showStickersMobile, setShowStickersMobile] = useState(false);
   const [adPlaying, setAdPlaying] = useState(false);
 
   useEffect(() => {
@@ -779,13 +781,24 @@ export function Room() {
                 {messages.map((msg) => (
                   <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"} mb-1.5`}>
                     <span className="text-[10px] text-gray-500 mb-0.5">{msg.author}</span>
-                    <div className={`px-3 py-1.5 rounded-2xl max-w-[80%] text-sm ${
-                      msg.author === username
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-gray-700 text-white rounded-bl-sm"
-                    }`}>
-                      {msg.text}
-                    </div>
+                    {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
+                      <video
+                        src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
+                        className="w-32 h-32 object-contain"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <div className={`px-3 py-1.5 rounded-2xl max-w-[80%] text-sm ${
+                        msg.author === username
+                          ? "bg-blue-600 text-white rounded-br-sm"
+                          : "bg-gray-700 text-white rounded-bl-sm"
+                      }`}>
+                        {msg.text}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
@@ -813,6 +826,17 @@ export function Room() {
                 </label>
               )}
 
+              {/* Sticker panel */}
+              {showStickersMobile && (
+                <StickerPanel
+                  onSendSticker={(url) => {
+                    emitChatMessage(username, `[sticker]${url}[/sticker]`);
+                    setShowStickersMobile(false);
+                  }}
+                  onClose={() => setShowStickersMobile(false)}
+                />
+              )}
+
               {/* Input */}
               <form
                 onSubmit={(e) => {
@@ -824,8 +848,17 @@ export function Room() {
                     input.value = "";
                   }
                 }}
-                className="flex gap-2 px-3 pb-3 pt-1 shrink-0"
+                className="flex gap-1 px-3 pb-3 pt-1 shrink-0"
               >
+                <button
+                  type="button"
+                  onClick={() => setShowStickersMobile(!showStickersMobile)}
+                  className={`text-xl px-2 rounded-lg shrink-0 transition-colors ${
+                    showStickersMobile ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  🎨
+                </button>
                 <input
                   name="chatInput"
                   type="text"
