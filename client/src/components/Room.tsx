@@ -114,7 +114,8 @@ export function Room() {
       if (data.userId === socket?.id) return;
       const localTime = videoPlayerRef.current?.getCurrentTime() || 0;
       const drift = Math.abs(data.time - localTime);
-      if (drift > 2) {
+      const threshold = videoType === "file" ? 8 : 2;
+      if (drift > threshold) {
         console.log(`Drift detected: ${drift.toFixed(2)}s, correcting...`);
         videoPlayerRef.current?.seek(data.time);
       }
@@ -206,7 +207,7 @@ export function Room() {
         clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [socket, code, playerReady, playerState, username, adPlaying]);
+  }, [socket, code, playerReady, playerState, username, adPlaying, videoType]);
 
   const handleLogin = (name: string) => {
     localStorage.setItem("wt_username", name);
