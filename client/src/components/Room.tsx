@@ -45,6 +45,7 @@ export function Room() {
     if (chatExpanded) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, chatExpanded]);
   const [playerState, setPlayerState] = useState<"playing" | "paused" | "ended">("paused");
+  const playerStateRef = useRef<"playing" | "paused" | "ended">("paused");
   const [isHost, setIsHost] = useState(false);
   const [hostOnly, setHostOnly] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
@@ -54,6 +55,10 @@ export function Room() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSyncEventRef = useRef(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    playerStateRef.current = playerState;
+  }, [playerState]);
 
   const {
     socket,
@@ -106,9 +111,9 @@ export function Room() {
         console.log(`Drift detected: ${drift.toFixed(2)}s, correcting...`);
         videoPlayerRef.current?.seek(data.time);
       }
-      if (data.isPlaying && playerState !== "playing") {
+      if (data.isPlaying && playerStateRef.current !== "playing") {
         videoPlayerRef.current?.play();
-      } else if (!data.isPlaying && playerState !== "paused") {
+      } else if (!data.isPlaying && playerStateRef.current !== "paused") {
         videoPlayerRef.current?.pause();
       }
     });
@@ -403,7 +408,7 @@ export function Room() {
               </div>
             ))}
             {/* Sticker chat messages — right edge overlay */}
-            <div className="absolute right-3 top-3 bottom-3 w-72 flex flex-col justify-end gap-1.5 pointer-events-none overflow-hidden">
+            <div className="absolute right-3 top-3 bottom-3 w-72 flex flex-col justify-end gap-1.5 pointer-events-none z-10">
               {messages.slice(-5).map((msg, i) => (
                 <div
                   key={msg.id || i}
@@ -629,7 +634,7 @@ export function Room() {
 
           {/* Floating controls — bottom of video */}
           {videoUrl && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 z-10">
               {adPlaying && (
                 <div className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold animate-pulse mb-1.5 inline-block">📺 Реклама</div>
               )}
@@ -720,14 +725,14 @@ export function Room() {
 
         {/* Chat overlay — peek / expanded */}
         <div
-          className={`absolute left-0 right-0 bottom-0 z-20 transition-all duration-300 ease-out ${
-            chatExpanded ? "top-[15%]" : ""
+          className={`absolute left-0 right-0 z-20 transition-all duration-300 ease-out ${
+            chatExpanded ? "top-[15%] bottom-0" : "bottom-[52px]"
           }`}
           style={{ touchAction: chatExpanded ? "none" : "auto" }}
         >
           {chatExpanded ? (
             /* Expanded chat — full overlay */
-            <div className="h-full flex flex-col bg-gray-950/95 backdrop-blur-sm rounded-t-2xl overflow-hidden">
+            <div className="h-full flex flex-col bg-gray-950/85 backdrop-blur-sm rounded-t-2xl overflow-hidden">
               {/* Drag handle */}
               <button
                 onClick={() => setChatExpanded(false)}
@@ -804,7 +809,7 @@ export function Room() {
             /* Peek — last 2 messages + tap to expand */
             <button
               onClick={() => setChatExpanded(true)}
-              className="w-full text-left bg-black/70 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
+              className="w-full text-left bg-black/50 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-white/60 text-xs">💬 Чат</span>

@@ -107,6 +107,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
         const div = document.createElement("div");
         div.id = `yt-player-${videoInfo.id}-${Date.now()}`;
+        div.style.width = "100%";
+        div.style.height = "100%";
         containerRef.current.appendChild(div);
 
         ytPlayerRef.current = new window.YT.Player(div.id, {
@@ -125,24 +127,49 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
               if (destroyed) return;
 
               // Detect YouTube ads
-              // YouTube ads: state is PLAYING but getVideoData().video_id differs from main video
-              // or player is in ad mode (adPlaying flag in YT API)
               try {
-                const playerState = e.data;
-                const isYTAdPlaying = ytPlayerRef.current?.getAdPlaying?.() || false;
-                const videoData = ytPlayerRef.current?.getVideoData?.() || {};
-                const isDifferentVideo = videoData.video_id && videoInfo && videoData.video_id !== videoInfo.id;
+                const ytState = e.data;
+                let isAd = false;
 
-                const isAd = isYTAdPlaying || isDifferentVideo || (playerState === window.YT.PlayerState.PLAYING && currentTimeRef.current === 0 && adPlayingRef.current);
+                // Method 1: getAdPlaying() — official API
+                try {
+                  if (typeof ytPlayerRef.current?.getAdPlaying === "function") {
+                    isAd = ytPlayerRef.current.getAdPlaying();
+                  }
+                } catch {}
+
+                // Method 2: video_id mismatch — ad plays a different video
+                if (!isAd) {
+                  try {
+                    const videoData = ytPlayerRef.current?.getVideoData?.();
+                    if (videoData?.video_id && videoInfo && videoData.video_id !== videoInfo.id) {
+                      isAd = true;
+                    }
+                  } catch {}
+                }
+
+                // Method 3: duration <= 31s and playing from 0 = likely ad
+                if (!isAd && ytState === window.YT.PlayerState.PLAYING) {
+                  try {
+                    const dur = ytPlayerRef.current?.getDuration?.() || 0;
+                    const cur = ytPlayerRef.current?.getCurrentTime?.() || 0;
+                    if (dur > 0 && dur <= 31 && cur < 1) {
+                      isAd = true;
+                    }
+                  } catch {}
+                }
+
+                // Reset ad flag when video plays past 2 seconds
+                if (ytState === window.YT.PlayerState.PLAYING) {
+                  try {
+                    const cur = ytPlayerRef.current?.getCurrentTime?.() || 0;
+                    if (cur > 2) isAd = false;
+                  } catch {}
+                }
 
                 if (isAd !== adPlayingRef.current) {
                   adPlayingRef.current = isAd;
                   onAdStateChange?.(isAd);
-                }
-
-                // Track if we were paused then jumped to playing at time 0 (likely ad)
-                if (playerState === window.YT.PlayerState.PLAYING && currentTimeRef.current > 0.5) {
-                  adPlayingRef.current = false;
                 }
               } catch {}
 

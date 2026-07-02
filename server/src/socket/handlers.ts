@@ -182,16 +182,13 @@ export function setupSocketHandlers(io: Server) {
     socket.on("ad-started", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      // Only host can trigger ad state
-      if (roomState.hostSocketId !== socket.id) return;
-      socket.to(roomCode).emit("ad-state-changed", { isAd: true });
+      io.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
     socket.on("ad-ended", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      if (roomState.hostSocketId !== socket.id) return;
-      socket.to(roomCode).emit("ad-state-changed", { isAd: false });
+      io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string }) => {
