@@ -482,13 +482,12 @@ export function Room() {
                   const newAd = !adPlaying;
                   setAdPlaying(newAd);
                   const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                  if (newAd) {
-                    socket?.emit("ad-started", code);
-                    emitVideoSync("pause", time);
-                  } else {
-                    socket?.emit("ad-ended", code);
-                    emitVideoSync("play", time);
-                  }
+                  const action = newAd ? "pause" : "play";
+                  emitVideoSync(action, time);
+                  setSyncAction({ action, time });
+                  setTimeout(() => setSyncAction(null), 300);
+                  if (newAd) socket?.emit("ad-started", code);
+                  else socket?.emit("ad-ended", code);
                 }}
                 className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${adPlaying ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
               >
@@ -683,13 +682,12 @@ export function Room() {
                     const newAd = !adPlaying;
                     setAdPlaying(newAd);
                     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                    if (newAd) {
-                      socket?.emit("ad-started", code);
-                      emitVideoSync("pause", time);
-                    } else {
-                      socket?.emit("ad-ended", code);
-                      emitVideoSync("play", time);
-                    }
+                    const action = newAd ? "pause" : "play";
+                    emitVideoSync(action, time);
+                    setSyncAction({ action, time });
+                    setTimeout(() => setSyncAction(null), 300);
+                    if (newAd) socket?.emit("ad-started", code);
+                    else socket?.emit("ad-ended", code);
                   }}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}
                 >
