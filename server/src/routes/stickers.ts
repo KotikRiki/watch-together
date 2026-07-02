@@ -64,8 +64,8 @@ stickersRouter.get("/:packName", async (req, res) => {
               file_id: sticker.file_id,
               width: sticker.width,
               height: sticker.height,
-              is_animated: sticker.type === "animated",
-              is_video: sticker.type === "video",
+              is_animated: !!sticker.is_animated,
+              is_video: !!sticker.is_video,
             };
           }
         } catch {}
