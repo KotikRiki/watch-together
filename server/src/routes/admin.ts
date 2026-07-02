@@ -1,4 +1,5 @@
 import { Router } from "express";
+import os from "os";
 import { getDB } from "../db/sqlite";
 
 export const adminRouter = Router();
@@ -144,4 +145,55 @@ adminRouter.get("/history", (req, res) => {
   });
 
   res.json({ messages: enriched, total, page, limit });
+});
+
+adminRouter.get("/system", (_req, res) => {
+  const cpus = os.cpus();
+  const cpuModel = cpus[0]?.model || "Unknown";
+  const cpuCores = cpus.length;
+  const loadAvg = os.loadavg();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const memPercent = ((usedMem / totalMem) * 100).toFixed(1);
+  const uptime = os.uptime();
+  const processUptime = process.uptime();
+  const platform = os.platform();
+  const arch = os.arch();
+  const hostname = os.hostname();
+
+  const cpuTimes = cpus.reduce(
+    (acc, cpu) => {
+      acc.user += cpu.times.user;
+      acc.nice += cpu.times.nice;
+      acc.sys += cpu.times.sys;
+      acc.idle += cpu.times.idle;
+      acc.irq += cpu.times.irq;
+      return acc;
+    },
+    { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+  );
+  const totalCpuTime = Object.values(cpuTimes).reduce((a, b) => a + b, 0);
+  const cpuUsage = totalCpuTime > 0
+    ? (((totalCpuTime - cpuTimes.idle) / totalCpuTime) * 100).toFixed(1)
+    : "0";
+
+  res.json({
+    hostname,
+    platform,
+    arch,
+    cpuModel,
+    cpuCores,
+    cpuUsage: parseFloat(cpuUsage),
+    loadAvg1m: parseFloat(loadAvg[0].toFixed(2)),
+    loadAvg5m: parseFloat(loadAvg[1].toFixed(2)),
+    loadAvg15m: parseFloat(loadAvg[2].toFixed(2)),
+    totalMem,
+    usedMem,
+    freeMem,
+    memPercent: parseFloat(memPercent),
+    systemUptime: uptime,
+    processUptime: Math.floor(processUptime),
+    nodeVersion: process.version,
+  });
 });

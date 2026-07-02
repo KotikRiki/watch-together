@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface Stats {
   totalRooms: number;
@@ -11,6 +11,25 @@ interface Stats {
   roomsLastDay: number;
   messagesLastDay: number;
   topRooms: { code: string; views: number; totalMessages: number; createdAt: string }[];
+}
+
+interface SystemInfo {
+  hostname: string;
+  platform: string;
+  arch: string;
+  cpuModel: string;
+  cpuCores: number;
+  cpuUsage: number;
+  loadAvg1m: number;
+  loadAvg5m: number;
+  loadAvg15m: number;
+  totalMem: number;
+  usedMem: number;
+  freeMem: number;
+  memPercent: number;
+  systemUptime: number;
+  processUptime: number;
+  nodeVersion: string;
 }
 
 interface Room {
@@ -36,8 +55,9 @@ interface Message {
 
 export function Admin() {
   const [auth, setAuth] = useState<string | null>(() => localStorage.getItem("wt_admin_auth"));
-  const [tab, setTab] = useState<"stats" | "rooms" | "history">("stats");
+  const [tab, setTab] = useState<"stats" | "rooms" | "history" | "system">("stats");
   const [stats, setStats] = useState<Stats | null>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomsTotal, setRoomsTotal] = useState(0);
   const [roomsPage, setRoomsPage] = useState(1);
@@ -65,24 +85,23 @@ export function Admin() {
     setAuth(null);
   };
 
-  useEffect(() => {
-    if (!auth) return;
-    if (tab === "stats") fetchStats();
-    if (tab === "rooms") fetchRooms();
-    if (tab === "history") fetchHistory();
-  }, [auth, tab, roomsPage, messagesPage, filterRoom, search]);
-
-  const fetchStats = async () => {
-    setLoading(true);
+  const fetchStats = useCallback(async () => {
     try {
       const r = await fetch("/api/admin/stats", { headers });
       if (r.ok) setStats(await r.json());
       else if (r.status === 401) logout();
     } catch {}
-    setLoading(false);
-  };
+  }, [auth]);
 
-  const fetchRooms = async () => {
+  const fetchSystem = useCallback(async () => {
+    try {
+      const r = await fetch("/api/admin/system", { headers });
+      if (r.ok) setSystemInfo(await r.json());
+      else if (r.status === 401) logout();
+    } catch {}
+  }, [auth]);
+
+  const fetchRooms = useCallback(async () => {
     setLoading(true);
     try {
       const r = await fetch(`/api/admin/rooms?page=${roomsPage}&limit=30&search=${search}`, { headers });
@@ -93,9 +112,9 @@ export function Admin() {
       } else if (r.status === 401) logout();
     } catch {}
     setLoading(false);
-  };
+  }, [auth, roomsPage, search]);
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
       const r = await fetch(`/api/admin/history?page=${messagesPage}&limit=100${filterRoom ? `&roomId=${filterRoom}` : ""}`, { headers });
@@ -106,7 +125,7 @@ export function Admin() {
       } else if (r.status === 401) logout();
     } catch {}
     setLoading(false);
-  };
+  }, [auth, messagesPage, filterRoom]);
 
   const fetchRoomDetail = async (code: string) => {
     try {
@@ -114,6 +133,21 @@ export function Admin() {
       if (r.ok) setSelectedRoom(await r.json());
     } catch {}
   };
+
+  useEffect(() => {
+    if (!auth) return;
+    if (tab === "stats") fetchStats();
+    if (tab === "rooms") fetchRooms();
+    if (tab === "history") fetchHistory();
+    if (tab === "system") fetchSystem();
+  }, [auth, tab, roomsPage, messagesPage, filterRoom, search]);
+
+  // Auto-refresh system tab every 3s
+  useEffect(() => {
+    if (!auth || tab !== "system") return;
+    const iv = setInterval(fetchSystem, 3000);
+    return () => clearInterval(iv);
+  }, [auth, tab, fetchSystem]);
 
   if (!auth) {
     return (
@@ -158,9 +192,8 @@ export function Admin() {
       </header>
 
       <div className="max-w-6xl mx-auto p-3 sm:p-4">
-        {/* Tabs */}
         <div className="flex gap-2 mb-4 overflow-x-auto">
-          {(["stats", "rooms", "history"] as const).map((t) => (
+          {(["stats", "rooms", "history", "system"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -168,7 +201,7 @@ export function Admin() {
                 tab === t ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"
               }`}
             >
-              {t === "stats" ? "📊 Статистика" : t === "rooms" ? "🏠 Комнаты" : "📜 История"}
+              {t === "stats" ? "📊 Статистика" : t === "rooms" ? "🏠 Комнаты" : t === "history" ? "📜 История" : "🖥 Сервер"}
             </button>
           ))}
         </div>
@@ -216,6 +249,111 @@ export function Admin() {
           </div>
         )}
 
+        {/* System Tab */}
+        {tab === "system" && systemInfo && (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold">🖥 Информация о сервере</h3>
+                <span className="text-green-400 text-xs animate-pulse">● Live</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <InfoBox label="Хост" value={systemInfo.hostname} />
+                <InfoBox label="Платформа" value={`${systemInfo.platform} (${systemInfo.arch})`} />
+                <InfoBox label="Node.js" value={systemInfo.nodeVersion} />
+                <InfoBox label="CPU" value={systemInfo.cpuModel} wide />
+                <InfoBox label="Ядра" value={systemInfo.cpuCores.toString()} />
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">⚡ CPU</h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-400">Загрузка CPU</span>
+                    <span className={systemInfo.cpuUsage > 80 ? "text-red-400" : systemInfo.cpuUsage > 50 ? "text-yellow-400" : "text-green-400"}>
+                      {systemInfo.cpuUsage}%
+                    </span>
+                  </div>
+                  <div className="bg-gray-800 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        systemInfo.cpuUsage > 80 ? "bg-red-500" : systemInfo.cpuUsage > 50 ? "bg-yellow-500" : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(100, systemInfo.cpuUsage)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Load 1m</p>
+                    <p className="text-white font-bold">{systemInfo.loadAvg1m}</p>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Load 5m</p>
+                    <p className="text-white font-bold">{systemInfo.loadAvg5m}</p>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Load 15m</p>
+                    <p className="text-white font-bold">{systemInfo.loadAvg15m}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">🧠 Память</h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-400">Использование RAM</span>
+                    <span className={systemInfo.memPercent > 80 ? "text-red-400" : systemInfo.memPercent > 50 ? "text-yellow-400" : "text-green-400"}>
+                      {systemInfo.memPercent}%
+                    </span>
+                  </div>
+                  <div className="bg-gray-800 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        systemInfo.memPercent > 80 ? "bg-red-500" : systemInfo.memPercent > 50 ? "bg-yellow-500" : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(100, systemInfo.memPercent)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Всего</p>
+                    <p className="text-white font-bold">{formatSize(systemInfo.totalMem)}</p>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Занято</p>
+                    <p className="text-orange-400 font-bold">{formatSize(systemInfo.usedMem)}</p>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-3">
+                    <p className="text-gray-400 text-xs">Свободно</p>
+                    <p className="text-green-400 font-bold">{formatSize(systemInfo.freeMem)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">⏱ Аптайм</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-gray-400 text-xs">Система</p>
+                  <p className="text-white font-bold">{formatUptime(systemInfo.systemUptime)}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-gray-400 text-xs">Процесс</p>
+                  <p className="text-blue-400 font-bold">{formatUptime(systemInfo.processUptime)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rooms Tab */}
         {tab === "rooms" && (
           <div className="space-y-3">
@@ -258,25 +396,12 @@ export function Admin() {
 
             {roomsTotal > 30 && (
               <div className="flex gap-2 justify-center">
-                <button
-                  onClick={() => setRoomsPage((p) => Math.max(1, p - 1))}
-                  disabled={roomsPage === 1}
-                  className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                >
-                  ← Назад
-                </button>
+                <button onClick={() => setRoomsPage((p) => Math.max(1, p - 1))} disabled={roomsPage === 1} className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50">← Назад</button>
                 <span className="text-gray-400 text-sm py-1">{roomsPage} / {Math.ceil(roomsTotal / 30)}</span>
-                <button
-                  onClick={() => setRoomsPage((p) => p + 1)}
-                  disabled={roomsPage >= Math.ceil(roomsTotal / 30)}
-                  className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                >
-                  Далее →
-                </button>
+                <button onClick={() => setRoomsPage((p) => p + 1)} disabled={roomsPage >= Math.ceil(roomsTotal / 30)} className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50">Далее →</button>
               </div>
             )}
 
-            {/* Room detail modal */}
             {selectedRoom && (
               <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setSelectedRoom(null)}>
                 <div className="bg-gray-900 rounded-2xl p-4 w-full max-w-lg max-h-[80vh] overflow-y-auto border border-gray-700" onClick={(e) => e.stopPropagation()}>
@@ -286,15 +411,13 @@ export function Admin() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">👁 Просмотры:</span> {selectedRoom.views}</div>
-                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">💬 Сообщений:</span> {selectedRoom.messages.length}</div>
-                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">📁 Загрузок:</span> {selectedRoom.uploads.length}</div>
-                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">📋 Очередь:</span> {selectedRoom.queue.length}</div>
+                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">👁:</span> {selectedRoom.views}</div>
+                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">💬:</span> {selectedRoom.messages.length}</div>
+                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">📁:</span> {selectedRoom.uploads.length}</div>
+                    <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">📋:</span> {selectedRoom.queue.length}</div>
                   </div>
 
-                  {selectedRoom.videoUrl && (
-                    <p className="text-gray-400 text-xs mb-3 truncate">Видео: {selectedRoom.videoUrl}</p>
-                  )}
+                  {selectedRoom.videoUrl && <p className="text-gray-400 text-xs mb-3 truncate">Видео: {selectedRoom.videoUrl}</p>}
 
                   {selectedRoom.uploads.length > 0 && (
                     <div className="mb-4">
@@ -303,13 +426,12 @@ export function Admin() {
                         <div key={u.id} className="bg-gray-800 rounded-lg p-2 text-xs mb-1">
                           <span className="text-gray-300">{u.originalName}</span>
                           <span className="text-gray-500 ml-2">{formatSize(u.size)}</span>
-                          <span className="text-gray-600 ml-2">{u.uploadedBy || "—"}</span>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <h4 className="text-white font-semibold text-sm mb-2">💬 Сообщения ({selectedRoom.messages.length})</h4>
+                  <h4 className="text-white font-semibold text-sm mb-2">💬 ({selectedRoom.messages.length})</h4>
                   <div className="space-y-1 max-h-60 overflow-y-auto">
                     {selectedRoom.messages.map((m: any) => (
                       <div key={m.id} className="text-xs bg-gray-800 rounded-lg p-2">
@@ -347,9 +469,7 @@ export function Admin() {
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-blue-400 font-semibold">{m.author}</span>
                     <span className="text-gray-600 text-xs">{new Date(m.createdAt).toLocaleString()}</span>
-                    {m.roomCode && (
-                      <span className="text-gray-500 font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded">{m.roomCode}</span>
-                    )}
+                    {m.roomCode && <span className="text-gray-500 font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded">{m.roomCode}</span>}
                   </div>
                   <p className="text-gray-300">{m.text}</p>
                 </div>
@@ -358,21 +478,9 @@ export function Admin() {
 
             {messagesTotal > 100 && (
               <div className="flex gap-2 justify-center">
-                <button
-                  onClick={() => setMessagesPage((p) => Math.max(1, p - 1))}
-                  disabled={messagesPage === 1}
-                  className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                >
-                  ← Назад
-                </button>
+                <button onClick={() => setMessagesPage((p) => Math.max(1, p - 1))} disabled={messagesPage === 1} className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50">← Назад</button>
                 <span className="text-gray-400 text-sm py-1">{messagesPage} / {Math.ceil(messagesTotal / 100)}</span>
-                <button
-                  onClick={() => setMessagesPage((p) => p + 1)}
-                  disabled={messagesPage >= Math.ceil(messagesTotal / 100)}
-                  className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                >
-                  Далее →
-                </button>
+                <button onClick={() => setMessagesPage((p) => p + 1)} disabled={messagesPage >= Math.ceil(messagesTotal / 100)} className="bg-gray-800 text-white px-3 py-1 rounded text-sm disabled:opacity-50">Далее →</button>
               </div>
             )}
           </div>
@@ -382,9 +490,27 @@ export function Admin() {
   );
 }
 
+function InfoBox({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`bg-gray-800 rounded-lg p-2 ${wide ? "col-span-2 sm:col-span-3" : ""}`}>
+      <p className="text-gray-400 text-xs">{label}</p>
+      <p className="text-white text-sm font-semibold truncate">{value}</p>
+    </div>
+  );
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
   return `${(bytes / 1073741824).toFixed(2)} GB`;
+}
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }

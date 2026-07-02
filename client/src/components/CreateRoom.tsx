@@ -9,7 +9,10 @@ export function CreateRoom() {
   const handleCreate = async () => {
     setIsCreating(true);
     try {
-      const response = await fetch(`http://${window.location.hostname}:3001/api/rooms`, {
+      const apiUrl = window.location.port === "5173"
+        ? `http://${window.location.hostname}:3001`
+        : "";
+      const response = await fetch(`${apiUrl}/api/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
