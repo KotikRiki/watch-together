@@ -55,6 +55,8 @@ initDB().then(() => {
     console.log(`Server running on port ${PORT}`);
   });
 }).catch((err) => {
-  console.error("Failed to init database:", err);
-  process.exit(1);
+  console.error("Failed to init database, using JSON fallback:", err.message);
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT} (JSON fallback)`);
+  });
 });
