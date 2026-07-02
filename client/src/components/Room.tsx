@@ -56,7 +56,7 @@ export function Room() {
   const lastSyncEventRef = useRef(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncFromActionRef = useRef(false);
-  const syncingRef = useRef(false);
+  const lastExternalChangeRef = useRef(0);
 
   useEffect(() => {
     playerStateRef.current = playerState;
@@ -101,9 +101,10 @@ export function Room() {
 
     on("video-sync", (data: { action: string; time: number; userId: string }) => {
       if (data.userId === socket?.id) return;
-      syncingRef.current = true;
+      const sinceExternal = Date.now() - lastExternalChangeRef.current;
+      if (sinceExternal < 1500) return;
       setSyncAction({ action: data.action, time: data.time });
-      setTimeout(() => { setSyncAction(null); syncingRef.current = false; }, 300);
+      setTimeout(() => setSyncAction(null), 300);
     });
 
     on("heartbeat", (data: { time: number; isPlaying: boolean; userId: string }) => {
@@ -114,10 +115,13 @@ export function Room() {
         console.log(`Drift detected: ${drift.toFixed(2)}s, correcting...`);
         videoPlayerRef.current?.seek(data.time);
       }
-      if (data.isPlaying && playerStateRef.current !== "playing") {
-        videoPlayerRef.current?.play();
-      } else if (!data.isPlaying && playerStateRef.current !== "paused") {
-        videoPlayerRef.current?.pause();
+      const sinceExternal = Date.now() - lastExternalChangeRef.current;
+      if (sinceExternal > 3000) {
+        if (data.isPlaying && playerStateRef.current !== "playing") {
+          videoPlayerRef.current?.play();
+        } else if (!data.isPlaying && playerStateRef.current !== "paused") {
+          videoPlayerRef.current?.pause();
+        }
       }
     });
 
@@ -302,6 +306,7 @@ export function Room() {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoAction(newAction, time);
     lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
     syncFromActionRef.current = true;
     setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: newAction, time });
@@ -340,6 +345,7 @@ export function Room() {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoAction(newState === "playing" ? "play" : "pause", time);
     lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
   };
 
   if (!username) {
