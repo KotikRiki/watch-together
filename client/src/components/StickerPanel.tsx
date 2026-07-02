@@ -91,12 +91,22 @@ export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
                 onClick={() => onSendSticker(sticker.url)}
                 className="aspect-square rounded-lg overflow-hidden bg-gray-800 hover:bg-gray-700 active:scale-95 transition-all p-1"
               >
-                <img
-                  src={sticker.url}
-                  alt={sticker.emoji}
-                  className="w-full h-full object-contain"
-                  loading="lazy"
-                />
+                {sticker.url.endsWith(".webm") || sticker.url.endsWith(".tgs") ? (
+                  <video
+                    src={sticker.url}
+                    className="w-full h-full object-contain"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    src={sticker.url}
+                    alt={sticker.emoji}
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                )}
               </button>
             ))}
           </div>
