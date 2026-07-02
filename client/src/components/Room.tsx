@@ -68,6 +68,7 @@ export function Room() {
     users,
     joinRoom,
     emitVideoAction,
+    emitVideoSync,
     emitChangeVideo,
     emitChatMessage,
     emitEmojiReaction,
@@ -476,30 +477,23 @@ export function Room() {
               <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors">⏪ -10с</button>
               <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors">⏩ +10с</button>
               <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors" title="Синхронизировать всех участников">🔄 Синхр.</button>
-              {isHost && (
-                <button
-                  onClick={() => {
-                    const newAd = !adPlaying;
-                    setAdPlaying(newAd);
-                    if (newAd) {
-                      socket?.emit("ad-started", code);
-                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                      emitVideoAction("pause", time);
-                      setSyncAction({ action: "pause", time });
-                      setTimeout(() => setSyncAction(null), 300);
-                    } else {
-                      socket?.emit("ad-ended", code);
-                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                      emitVideoAction("play", time);
-                      setSyncAction({ action: "play", time });
-                      setTimeout(() => setSyncAction(null), 300);
-                    }
-                  }}
-                  className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${adPlaying ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
-                >
-                  📺 {adPlaying ? "Реклама идёт" : "Реклама"}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  const newAd = !adPlaying;
+                  setAdPlaying(newAd);
+                  const time = videoPlayerRef.current?.getCurrentTime() || 0;
+                  if (newAd) {
+                    socket?.emit("ad-started", code);
+                    emitVideoSync("pause", time);
+                  } else {
+                    socket?.emit("ad-ended", code);
+                    emitVideoSync("play", time);
+                  }
+                }}
+                className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${adPlaying ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+              >
+                📺 {adPlaying ? "Реклама идёт" : "Реклама"}
+              </button>
               <span className="text-xs text-gray-400 ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
             </div>
           )}
@@ -688,18 +682,13 @@ export function Room() {
                   onClick={() => {
                     const newAd = !adPlaying;
                     setAdPlaying(newAd);
+                    const time = videoPlayerRef.current?.getCurrentTime() || 0;
                     if (newAd) {
                       socket?.emit("ad-started", code);
-                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                      emitVideoAction("pause", time);
-                      setSyncAction({ action: "pause", time });
-                      setTimeout(() => setSyncAction(null), 300);
+                      emitVideoSync("pause", time);
                     } else {
                       socket?.emit("ad-ended", code);
-                      const time = videoPlayerRef.current?.getCurrentTime() || 0;
-                      emitVideoAction("play", time);
-                      setSyncAction({ action: "play", time });
-                      setTimeout(() => setSyncAction(null), 300);
+                      emitVideoSync("play", time);
                     }
                   }}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}

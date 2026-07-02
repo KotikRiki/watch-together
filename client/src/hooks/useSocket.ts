@@ -45,6 +45,12 @@ export function useSocket(roomCode: string | null) {
     }
   };
 
+  const emitVideoSync = (action: string, time: number) => {
+    if (socketRef.current && roomCode) {
+      socketRef.current.emit("ad-sync", roomCode, action, time);
+    }
+  };
+
   const emitChangeVideo = (videoUrl: string, videoType: string = "embed") => {
     if (socketRef.current && roomCode) {
       socketRef.current.emit("change-video", roomCode, videoUrl, videoType);
@@ -93,6 +99,7 @@ export function useSocket(roomCode: string | null) {
     users,
     joinRoom,
     emitVideoAction,
+    emitVideoSync,
     emitChangeVideo,
     emitChatMessage,
     emitEmojiReaction,

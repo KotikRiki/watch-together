@@ -191,6 +191,17 @@ export function setupSocketHandlers(io: Server) {
       io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
+    socket.on("ad-sync", (roomCode: string, action: string, time: number) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+
+      roomState.isPlaying = action === "play";
+      roomState.currentTime = time;
+      roomState.lastSyncTime = Date.now();
+
+      socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+    });
+
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string }) => {
       let roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
       let roomId: string;
