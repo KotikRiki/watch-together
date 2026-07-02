@@ -112,7 +112,7 @@ export function Room() {
       if (data.userId === socket?.id) return;
       const localTime = videoPlayerRef.current?.getCurrentTime() || 0;
       const drift = Math.abs(data.time - localTime);
-      if (drift > 0.5) {
+      if (drift > 2) {
         console.log(`Drift detected: ${drift.toFixed(2)}s, correcting...`);
         videoPlayerRef.current?.seek(data.time);
       }
