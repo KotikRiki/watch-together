@@ -268,18 +268,34 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       syncActiveRef.current = true;
       setTimeout(() => { syncActiveRef.current = false; }, 500);
       if (syncAction.action === "play") {
-        if (isFile) videoRef.current?.play();
-        else {
+        currentTimeRef.current = syncAction.time;
+        if (isFile && videoRef.current) {
+          videoRef.current.currentTime = syncAction.time;
+          videoRef.current.play();
+        } else if (videoInfo?.type === "youtube") {
+          ytPlayerRef.current?.seekTo?.(syncAction.time, true);
           ytPlayerRef.current?.playVideo?.();
+        } else if (videoInfo?.type === "rutube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
+        } else if (videoInfo?.type === "vk") {
+          vkPlayerRef.current?.seek?.(syncAction.time);
           vkPlayerRef.current?.play?.();
         }
         onStateChange?.("playing");
       } else if (syncAction.action === "pause") {
-        if (isFile) videoRef.current?.pause();
-        else {
+        currentTimeRef.current = syncAction.time;
+        if (isFile && videoRef.current) {
+          videoRef.current.currentTime = syncAction.time;
+          videoRef.current.pause();
+        } else if (videoInfo?.type === "youtube") {
+          ytPlayerRef.current?.seekTo?.(syncAction.time, true);
           ytPlayerRef.current?.pauseVideo?.();
+        } else if (videoInfo?.type === "rutube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
+        } else if (videoInfo?.type === "vk") {
+          vkPlayerRef.current?.seek?.(syncAction.time);
           vkPlayerRef.current?.pause?.();
         }
         onStateChange?.("paused");

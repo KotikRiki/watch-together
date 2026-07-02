@@ -42,32 +42,32 @@ function getCpuPercent(): number {
 adminRouter.get("/stats", async (_req, res) => {
   try {
     const [roomsResult, msgsResult, uploadsResult, queueResult, viewsResult, sizeResult, authorsResult, roomsDayResult, msgsDayResult, topResult] = await Promise.all([
-      query("SELECT COUNT(*)::int as cnt FROM rooms"),
-      query("SELECT COUNT(*)::int as cnt FROM messages"),
-      query("SELECT COUNT(*)::int as cnt FROM uploads"),
-      query("SELECT COUNT(*)::int as cnt FROM queue"),
-      query("SELECT COALESCE(SUM(views), 0)::int as total FROM rooms"),
-      query("SELECT COALESCE(SUM(size), 0)::bigint as total FROM uploads"),
-      query("SELECT COUNT(DISTINCT author)::int as cnt FROM messages"),
-      query("SELECT COUNT(*)::int as cnt FROM rooms WHERE created_at > NOW() - INTERVAL '1 day'"),
-      query("SELECT COUNT(*)::int as cnt FROM messages WHERE created_at > NOW() - INTERVAL '1 day'"),
+      query("SELECT COUNT(*)::int as cnt FROM rooms").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COUNT(*)::int as cnt FROM messages").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COUNT(*)::int as cnt FROM uploads").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COUNT(*)::int as cnt FROM queue").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COALESCE(SUM(views), 0)::int as total FROM rooms").catch(() => ({ rows: [{ total: 0 }] })),
+      query("SELECT COALESCE(SUM(size), 0)::bigint as total FROM uploads").catch(() => ({ rows: [{ total: 0 }] })),
+      query("SELECT COUNT(DISTINCT author)::int as cnt FROM messages").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COUNT(*)::int as cnt FROM rooms WHERE created_at > NOW() - INTERVAL '1 day'").catch(() => ({ rows: [{ cnt: 0 }] })),
+      query("SELECT COUNT(*)::int as cnt FROM messages WHERE created_at > NOW() - INTERVAL '1 day'").catch(() => ({ rows: [{ cnt: 0 }] })),
       query(`SELECT r.code, r.views, 
         (SELECT COUNT(*)::int FROM messages m WHERE m.room_id = r.id) as "totalMessages",
         r.created_at as "createdAt"
-        FROM rooms r ORDER BY r.views DESC LIMIT 10`),
+        FROM rooms r ORDER BY r.views DESC LIMIT 10`).catch(() => ({ rows: [] })),
     ]);
 
     res.json({
-      totalRooms: roomsResult.rows[0].cnt,
-      totalMessages: msgsResult.rows[0].cnt,
-      totalUploads: uploadsResult.rows[0].cnt,
-      totalQueueItems: queueResult.rows[0].cnt,
-      totalViews: viewsResult.rows[0].total,
-      totalSize: parseInt(sizeResult.rows[0].total),
-      uniqueUsers: authorsResult.rows[0].cnt,
-      roomsLastDay: roomsDayResult.rows[0].cnt,
-      messagesLastDay: msgsDayResult.rows[0].cnt,
-      topRooms: topResult.rows,
+      totalRooms: roomsResult.rows[0]?.cnt || 0,
+      totalMessages: msgsResult.rows[0]?.cnt || 0,
+      totalUploads: uploadsResult.rows[0]?.cnt || 0,
+      totalQueueItems: queueResult.rows[0]?.cnt || 0,
+      totalViews: viewsResult.rows[0]?.total || 0,
+      totalSize: parseInt(sizeResult.rows[0]?.total) || 0,
+      uniqueUsers: authorsResult.rows[0]?.cnt || 0,
+      roomsLastDay: roomsDayResult.rows[0]?.cnt || 0,
+      messagesLastDay: msgsDayResult.rows[0]?.cnt || 0,
+      topRooms: topResult.rows || [],
     });
   } catch (error) {
     console.error("Stats error:", error);
@@ -158,19 +158,19 @@ adminRouter.get("/rooms", async (req, res) => {
     }
 
     const [roomsResult, countResult] = await Promise.all([
-      query(roomsQuery, params),
-      query(countQuery, search ? [`%${search}%`] : []),
+      query(roomsQuery, params).catch(() => ({ rows: [] })),
+      query(countQuery, search ? [`%${search}%`] : []).catch(() => ({ rows: [{ cnt: 0 }] })),
     ]);
 
     res.json({
       rooms: roomsResult.rows,
-      total: countResult.rows[0].cnt,
+      total: countResult.rows[0]?.cnt || 0,
       page,
       limit,
     });
   } catch (error) {
     console.error("Rooms list error:", error);
-    res.status(500).json({ error: "Failed to get rooms" });
+    res.status(500).json({ error: "Failed to get rooms", rooms: [], total: 0 });
   }
 });
 

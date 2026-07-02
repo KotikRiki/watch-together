@@ -91,7 +91,8 @@ export function Admin() {
       const r = await fetch("/api/admin/stats", { headers });
       if (r.ok) setStats(await r.json());
       else if (r.status === 401) logout();
-    } catch {}
+      else console.error("Stats fetch failed:", r.status, await r.text().catch(() => ""));
+    } catch (e) { console.error("Stats fetch error:", e); }
   }, [auth]);
 
   const fetchSystem = useCallback(async () => {
