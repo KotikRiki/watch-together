@@ -667,19 +667,17 @@ export function Room() {
                 <button onClick={() => setShowCall(!showCall)} className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
                   {showCall ? "📞" : "📹"}
                 </button>
-                {isHost && (
-                  <button
-                    onClick={() => {
-                      const newAd = !adPlaying;
-                      setAdPlaying(newAd);
-                      if (newAd) socket?.emit("ad-started", code);
-                      else socket?.emit("ad-ended", code);
-                    }}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}
-                  >
-                    📺
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    const newAd = !adPlaying;
+                    setAdPlaying(newAd);
+                    if (newAd) socket?.emit("ad-started", code);
+                    else socket?.emit("ad-ended", code);
+                  }}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}
+                >
+                  📺
+                </button>
               </div>
               {uploading && (
                 <div className="mt-1 flex items-center gap-2">
@@ -741,7 +739,7 @@ export function Room() {
         >
           {chatExpanded ? (
             /* Expanded chat — full overlay */
-            <div className="h-full flex flex-col bg-black/60 backdrop-blur-md rounded-t-2xl overflow-hidden">
+            <div className="h-full flex flex-col bg-black/40 backdrop-blur-lg rounded-t-2xl overflow-hidden">
               {/* Close button */}
               <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0">
                 <span className="text-gray-400 text-xs font-semibold">💬 Чат</span>
@@ -821,7 +819,7 @@ export function Room() {
             /* Peek — last 2 messages + tap to expand */
             <button
               onClick={() => setChatExpanded(true)}
-              className="w-full text-left bg-black/30 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
+              className="w-full text-left bg-black/20 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-white/60 text-xs">💬 Чат</span>
