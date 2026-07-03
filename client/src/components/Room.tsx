@@ -48,6 +48,7 @@ export function Room() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRotateHint, setShowRotateHint] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const rotateHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(() => {
     const ua = navigator.userAgent;
@@ -460,6 +461,27 @@ export function Room() {
     setTimeout(() => setReactions((prev) => prev.filter((x) => x.id !== r.id)), 3000);
   };
 
+  const handleDownloadToServer = async (url: string) => {
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        emitChangeVideo(data.url, "file");
+      } else {
+        alert(data.error || "Ошибка скачивания");
+      }
+    } catch (e) {
+      alert("Ошибка скачивания");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const canControl = !hostOnly || isHost;
 
   const handlePlayPause = () => {
@@ -744,7 +766,7 @@ export function Room() {
             )}
           </div>
 
-          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} />
+          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDownloadToServer={handleDownloadToServer} downloading={downloading} />
         </div>
 
         {/* Chat sidebar */}

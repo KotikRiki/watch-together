@@ -11,9 +11,11 @@ interface QueueProps {
   queue: QueueItem[];
   onAddVideo: (url: string, title?: string) => void;
   onNext: () => void;
+  onDownloadToServer?: (url: string) => void;
+  downloading?: boolean;
 }
 
-export function Queue({ queue, onAddVideo, onNext }: QueueProps) {
+export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloading }: QueueProps) {
   const [newUrl, setNewUrl] = useState("");
 
   const handleAdd = () => {
@@ -41,6 +43,15 @@ export function Queue({ queue, onAddVideo, onNext }: QueueProps) {
         >
           Добавить
         </button>
+        {onDownloadToServer && (
+          <button
+            onClick={() => { if (newUrl.trim()) { onDownloadToServer(newUrl.trim()); setNewUrl(""); } }}
+            disabled={downloading}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50"
+          >
+            {downloading ? "⏳" : "📥"}
+          </button>
+        )}
       </div>
 
       <div className="space-y-2 mb-4">
