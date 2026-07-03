@@ -1099,11 +1099,11 @@ export function Room() {
             {!chatExpanded && (
               <button
                 onClick={() => setChatExpanded(true)}
-                className="absolute bottom-4 right-4 z-30 w-12 h-12 rounded-full bg-blue-600/90 backdrop-blur text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-90 transition-transform"
+                className="absolute bottom-20 right-3 z-30 w-9 h-9 rounded-full bg-white/10 backdrop-blur text-white/40 flex items-center justify-center active:scale-90 transition-all hover:bg-white/15 hover:text-white/60"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>
                 )}
               </button>
             )}
