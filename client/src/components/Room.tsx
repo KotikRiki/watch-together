@@ -55,6 +55,7 @@ export function Room() {
     return isSmallScreen || (isTouchDevice && isMobileUA);
   });
   const roomContainerRef = useRef<HTMLDivElement>(null);
+  const desktopContainerRef = useRef<HTMLDivElement>(null);
   const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
   const isUserActionRef = useRef(false);
   const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
@@ -100,7 +101,8 @@ export function Room() {
         document.exitFullscreen().catch(() => {});
         // After exit, apply our container fullscreen
         setTimeout(() => {
-          roomContainerRef.current?.requestFullscreen().catch(() => {});
+          const container = isMobile ? roomContainerRef.current : desktopContainerRef.current;
+          container?.requestFullscreen().catch(() => {});
         }, 100);
       }
     };
@@ -109,12 +111,13 @@ export function Room() {
   }, []);
 
   const toggleFullscreen = async () => {
-    if (!roomContainerRef.current) return;
+    const container = isMobile ? roomContainerRef.current : desktopContainerRef.current;
+    if (!container) return;
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
       } else {
-        await roomContainerRef.current.requestFullscreen();
+        await container.requestFullscreen();
       }
     } catch {}
   };
@@ -556,7 +559,7 @@ export function Room() {
         </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
-      <div ref={roomContainerRef} className={`${isMobile ? "hidden" : "flex"} flex-1 gap-0 min-h-0`}>
+      <div ref={desktopContainerRef} className={`${isMobile ? "hidden" : "flex"} flex-1 gap-0 min-h-0`}>
         {/* Video column — takes all available space */}
         <div className="flex-1 flex flex-col min-w-0 p-3 pr-1.5 gap-2">
           {/* Video player */}
