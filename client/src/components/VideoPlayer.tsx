@@ -24,6 +24,8 @@ export interface VideoPlayerHandle {
   seek: (time: number) => void;
   getCurrentTime: () => number;
   isReady: () => boolean;
+  setPlaybackRate: (rate: number) => void;
+  smoothCorrect: (targetTime: number, isPlaying: boolean) => void;
 }
 
 function getVideoInfo(url: string): { type: string; id: string } | null {
@@ -347,6 +349,41 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         return currentTimeRef.current;
       },
       isReady: () => readyRef.current,
+      setPlaybackRate: (rate: number) => {
+        if (isFile && videoRef.current) {
+          videoRef.current.playbackRate = rate;
+        }
+      },
+      smoothCorrect: (targetTime: number, isPlaying: boolean) => {
+        const vid = videoRef.current;
+        if (!vid) return;
+
+        const current = vid.currentTime;
+        const drift = current - targetTime;
+        const absDrift = Math.abs(drift);
+
+        if (absDrift < 0.25) {
+          if (vid.playbackRate !== 1) vid.playbackRate = 1;
+          return;
+        }
+
+        if (absDrift > 4.5) {
+          const wasPlaying = !vid.paused;
+          vid.pause();
+          vid.currentTime = Math.max(0, targetTime);
+          if (wasPlaying && isPlaying) vid.play().catch(() => {});
+          vid.playbackRate = 1;
+        } else {
+          const rate = Math.max(0.8, Math.min(1.2, 1 + drift * -0.3));
+          vid.playbackRate = rate;
+          setTimeout(() => {
+            if (vid && vid.playbackRate !== 1) vid.playbackRate = 1;
+          }, 500);
+        }
+
+        if (isPlaying && vid.paused) vid.play().catch(() => {});
+        else if (!isPlaying && !vid.paused) vid.pause();
+      },
     }));
 
     // Reset when URL changes

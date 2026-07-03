@@ -112,19 +112,23 @@ export function Room() {
 
     on("heartbeat", (data: { time: number; isPlaying: boolean; userId: string }) => {
       if (data.userId === socket?.id) return;
-      const localTime = videoPlayerRef.current?.getCurrentTime() || 0;
-      const drift = Math.abs(data.time - localTime);
-      const threshold = videoType === "file" ? 8 : 2;
-      if (drift > threshold) {
-        console.log(`Drift detected: ${drift.toFixed(2)}s, correcting...`);
-        videoPlayerRef.current?.seek(data.time);
-      }
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
-      if (sinceExternal > 3000) {
-        if (data.isPlaying && playerStateRef.current !== "playing") {
-          videoPlayerRef.current?.play();
-        } else if (!data.isPlaying && playerStateRef.current !== "paused") {
-          videoPlayerRef.current?.pause();
+      if (sinceExternal < 1500) return;
+
+      if (videoType === "file") {
+        videoPlayerRef.current?.smoothCorrect(data.time, data.isPlaying);
+      } else {
+        const localTime = videoPlayerRef.current?.getCurrentTime() || 0;
+        const drift = Math.abs(data.time - localTime);
+        if (drift > 2) {
+          videoPlayerRef.current?.seek(data.time);
+        }
+        if (sinceExternal > 3000) {
+          if (data.isPlaying && playerStateRef.current !== "playing") {
+            videoPlayerRef.current?.play();
+          } else if (!data.isPlaying && playerStateRef.current !== "paused") {
+            videoPlayerRef.current?.pause();
+          }
         }
       }
     });
