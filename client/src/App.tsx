@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./hooks/useTheme";
 import { CreateRoom } from "./components/CreateRoom";
@@ -7,32 +7,25 @@ import { Admin } from "./components/Admin";
 
 function PWAUpdatePrompt() {
   const [needRefresh, setNeedRefresh] = useState(false);
-  const [updateSW, setUpdateSW] = useState<((reload?: boolean) => Promise<void>) | null>(null);
+  const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
-    let unreg: (() => void) | undefined;
     import("virtual:pwa-register").then(({ registerSW }) => {
-      const update = registerSW({
+      updateRef.current = registerSW({
         onNeedRefresh() {
           setNeedRefresh(true);
-          setUpdateSW(() => update);
-        },
-        onOfflineReady() {
-          console.log("App ready to work offline");
         },
       });
-      unreg = () => update();
     });
-    return () => { unreg?.(); };
   }, []);
 
   if (!needRefresh) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#12121a]/95 backdrop-blur-xl text-white px-4 py-3 rounded-2xl shadow-2xl shadow-black/50 flex items-center gap-3 text-sm font-medium border border-white/10 animate-[slideUp_0.3s_ease-out]">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-[#12121a]/95 backdrop-blur-xl text-white px-4 py-3 rounded-2xl shadow-2xl shadow-black/50 flex items-center gap-3 text-sm font-medium border border-white/10">
       <span className="text-white/80">Доступна новая версия</span>
       <button
-        onClick={() => updateSW?.(true)}
+        onClick={() => updateRef.current?.(true)}
         className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-500 transition-colors active:scale-95"
       >
         Обновить

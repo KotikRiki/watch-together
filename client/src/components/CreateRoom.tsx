@@ -120,23 +120,6 @@ export function CreateRoom() {
             Файлы
           </span>
         </div>
-
-        {/* Force update — hidden link */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={async () => {
-              if ("serviceWorker" in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                for (const r of regs) await r.unregister();
-              }
-              caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
-              window.location.reload();
-            }}
-            className="text-gray-700 text-[10px] hover:text-gray-500 transition-colors"
-          >
-            обновить
-          </button>
-        </div>
       </div>
     </div>
   );
