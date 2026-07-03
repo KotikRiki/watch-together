@@ -851,13 +851,14 @@ export function Room() {
             syncAction={syncAction}
           />
 
-          {/* Reactions — always on video */}
-          {reactions.map((r) => (
-            <div key={r.id} className={`absolute text-3xl pointer-events-none ${isLandscape ? "z-30" : ""}`} style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
-              {r.emoji}
-            </div>
-          ))}
         </div>
+
+        {/* Reactions — always on top of everything */}
+        {reactions.map((r) => (
+          <div key={r.id} className="absolute text-3xl pointer-events-none z-40" style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
+            {r.emoji}
+          </div>
+        ))}
 
         {/* ============ LANDSCAPE OVERLAYS ============ */}
         {isLandscape && (
@@ -970,6 +971,13 @@ export function Room() {
                 </div>
               </div>
             )}
+
+            {/* Emoji bar — bottom right in landscape */}
+            <div className="pointer-events-auto absolute bottom-14 right-3 z-30 flex gap-1 bg-[#0f0f18]/80 backdrop-blur-lg rounded-full px-2 py-1.5 border border-white/5">
+              {EMOJI_REACTIONS.map((emoji) => (
+                <button key={emoji} onClick={() => handleReaction(emoji)} className="text-base p-0.5 active:scale-125 transition-transform select-none">{emoji}</button>
+              ))}
+            </div>
           </div>
         )}
 
