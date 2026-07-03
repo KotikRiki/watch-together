@@ -549,7 +549,7 @@ export function Room() {
                 }}
                 className="flex-1 flex gap-2"
               >
-                <input name="videoUrlD" type="text" placeholder="YouTube, RuTube, VK Video..." className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
+                <input name="videoUrlD" type="text" placeholder="YouTube, RuTube или ссылка на файл..." className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
                 <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shrink-0 font-semibold transition-colors">▶</button>
               </form>
             </div>

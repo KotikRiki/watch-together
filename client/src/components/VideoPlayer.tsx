@@ -47,7 +47,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const ytPlayerRef = useRef<any>(null);
-    const vkPlayerRef = useRef<any>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
     const adPlayingRef = useRef(false);
@@ -225,45 +224,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       return () => window.removeEventListener("message", handleMessage);
     }, [videoUrl, videoInfo?.id]);
 
-    // VK Video wrapper API
-    useEffect(() => {
-      if (!videoUrl || !videoInfo || videoInfo.type !== "vk") return;
-
-      const loadVKAPI = () => {
-        if ((window as any).VK?.VideoPlayer) {
-          initVKPlayer();
-          return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://vk.com/js/api/videoplayer.js";
-        script.onload = initVKPlayer;
-        document.head.appendChild(script);
-      };
-
-      const initVKPlayer = () => {
-        if (!iframeRef.current || !(window as any).VK?.VideoPlayer) return;
-        try {
-          const player = (window as any).VK.VideoPlayer(iframeRef.current);
-          vkPlayerRef.current = player;
-          player.on((window as any).VK.VideoPlayer.Events.TIMEUPDATE, (state: any) => {
-            currentTimeRef.current = state.time;
-            onTimeUpdate(state.time);
-          });
-          player.on((window as any).VK.VideoPlayer.Events.INITED, () => {
-            readyRef.current = true;
-            onPlayerReady?.();
-          });
-        } catch {}
-      };
-
-      loadVKAPI();
-      return () => {
-        vkPlayerRef.current?.destroy?.();
-        vkPlayerRef.current = null;
-        readyRef.current = false;
-      };
-    }, [videoUrl, videoInfo?.id]);
-
     // Handle sync action from peer
     useEffect(() => {
       if (!syncAction) return;
@@ -280,9 +240,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         } else if (videoInfo?.type === "rutube") {
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
-        } else if (videoInfo?.type === "vk") {
-          vkPlayerRef.current?.seek?.(syncAction.time);
-          vkPlayerRef.current?.play?.();
         }
         onStateChange?.("playing");
       } else if (syncAction.action === "pause") {
@@ -296,9 +253,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         } else if (videoInfo?.type === "rutube") {
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
-        } else if (videoInfo?.type === "vk") {
-          vkPlayerRef.current?.seek?.(syncAction.time);
-          vkPlayerRef.current?.pause?.();
         }
         onStateChange?.("paused");
       } else if (syncAction.action === "seek") {
@@ -307,7 +261,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           videoRef.current.currentTime = syncAction.time;
         } else if (videoInfo?.type === "youtube") ytPlayerRef.current?.seekTo?.(syncAction.time, true);
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
-        else if (videoInfo?.type === "vk") vkPlayerRef.current?.seek?.(syncAction.time);
       }
     }, [syncAction, videoInfo?.type, isFile]);
 
@@ -318,7 +271,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         if (isFile) videoRef.current?.play();
         else if (videoInfo?.type === "youtube") ytPlayerRef.current?.playVideo?.();
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
-        else if (videoInfo?.type === "vk") vkPlayerRef.current?.play?.();
         onStateChange?.("playing");
         return true;
       },
@@ -327,7 +279,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         if (isFile) videoRef.current?.pause();
         else if (videoInfo?.type === "youtube") ytPlayerRef.current?.pauseVideo?.();
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
-        else if (videoInfo?.type === "vk") vkPlayerRef.current?.pause?.();
         onStateChange?.("paused");
         return true;
       },
@@ -338,7 +289,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           videoRef.current.currentTime = time;
         } else if (videoInfo?.type === "youtube") ytPlayerRef.current?.seekTo?.(time, true);
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time } }), "*");
-        else if (videoInfo?.type === "vk") vkPlayerRef.current?.seek?.(time);
         return true;
       },
       getCurrentTime: () => {
@@ -416,11 +366,27 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
-    // Unsupported link
     if (!videoInfo) {
       return (
         <div className="w-full aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
           <p className="text-gray-500 text-sm">Неподдерживаемая ссылка</p>
+        </div>
+      );
+    }
+
+    if (videoInfo.type === "vk") {
+      return (
+        <div className="w-full aspect-video bg-gray-900 rounded-lg flex flex-col items-center justify-center gap-3 p-4">
+          <p className="text-yellow-400 text-sm font-semibold">VK Video не поддерживается для синхронизации</p>
+          <p className="text-gray-500 text-xs text-center">Используйте YouTube, RuTube или загрузите файл</p>
+          <a
+            href={`https://vk.com/video${videoInfo.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 text-xs hover:underline"
+          >
+            Открыть на VK ↗
+          </a>
         </div>
       );
     }
@@ -431,8 +397,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           return `https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&disablekb=1`;
         case "rutube":
           return `https://rutube.ru/play/embed/${videoInfo.id}`;
-        case "vk":
-          return `https://vk.com/video_ext.php?oid=${videoInfo.id.split("_")[0]}&id=${videoInfo.id.split("_")[1]}`;
         default:
           return "";
       }
@@ -444,8 +408,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           return `https://www.youtube.com/watch?v=${videoInfo.id}`;
         case "rutube":
           return `https://rutube.ru/video/${videoInfo.id}`;
-        case "vk":
-          return `https://vk.com/video${videoInfo.id}`;
         default:
           return videoUrl;
       }
@@ -484,7 +446,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           rel="noopener noreferrer"
           className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded hover:bg-black/90 transition-colors"
         >
-          Открыть на {videoInfo.type === "rutube" ? "RuTube" : "VK"}
+          Открыть на RuTube
         </a>
       </div>
     );

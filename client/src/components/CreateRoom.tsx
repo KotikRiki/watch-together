@@ -91,7 +91,7 @@ export function CreateRoom() {
 
         {/* Platforms */}
         <div className="mt-6 text-center text-gray-500 text-sm">
-          YouTube • RuTube • VK Video
+          YouTube • RuTube • Загрузка файлов
         </div>
       </div>
     </div>
