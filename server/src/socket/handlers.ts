@@ -87,6 +87,8 @@ export function setupSocketHandlers(io: Server) {
         videoType: roomState.videoType,
         isHost: roomState.hostSocketId === socket.id,
         hostOnly: roomState.hostOnly,
+        currentTime: roomState.currentTime,
+        isPlaying: roomState.isPlaying,
       });
 
       io.to(roomCode).emit("user-count", { userCount: roomState.users.size });

@@ -15,6 +15,7 @@ interface VideoPlayerProps {
   onPlayerReady?: () => void;
   onAdStateChange?: (isAd: boolean) => void;
   onExternalStateChange?: (state: "playing" | "paused") => void;
+  onUserAction?: (action: "play" | "pause" | "seek", time: number) => void;
   syncAction: { action: string; time: number } | null;
 }
 
@@ -42,7 +43,7 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, onUserAction, syncAction }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,8 +62,25 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       const vid = videoRef.current;
       if (!vid) return;
 
-      const onPlay = () => { onStateChange?.("playing"); if (!syncActiveRef.current) onExternalStateChange?.("playing"); };
-      const onPause = () => { onStateChange?.("paused"); if (!syncActiveRef.current) onExternalStateChange?.("paused"); };
+      const onPlay = () => {
+        onStateChange?.("playing");
+        if (!syncActiveRef.current) {
+          onExternalStateChange?.("playing");
+          onUserAction?.("play", vid.currentTime);
+        }
+      };
+      const onPause = () => {
+        onStateChange?.("paused");
+        if (!syncActiveRef.current) {
+          onExternalStateChange?.("paused");
+          onUserAction?.("pause", vid.currentTime);
+        }
+      };
+      const onSeeked = () => {
+        if (!syncActiveRef.current) {
+          onUserAction?.("seek", vid.currentTime);
+        }
+      };
       const onEnded = () => { onStateChange?.("ended"); };
       const onTime = () => { currentTimeRef.current = vid.currentTime; };
       const onCanPlay = () => {
@@ -75,6 +93,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       vid.addEventListener("ended", onEnded);
       vid.addEventListener("timeupdate", onTime);
       vid.addEventListener("canplay", onCanPlay);
+      vid.addEventListener("seeked", onSeeked);
 
       return () => {
         vid.removeEventListener("play", onPlay);
@@ -82,6 +101,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         vid.removeEventListener("ended", onEnded);
         vid.removeEventListener("timeupdate", onTime);
         vid.removeEventListener("canplay", onCanPlay);
+        vid.removeEventListener("seeked", onSeeked);
         readyRef.current = false;
       };
     }, [isFile, videoUrl]);
