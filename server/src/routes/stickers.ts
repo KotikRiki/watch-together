@@ -123,8 +123,13 @@ stickersRouter.post("/admin/load", adminAuth, async (req, res) => {
   if (!BOT_TOKEN) {
     return res.status(500).json({ error: "Telegram bot token not configured" });
   }
-  const { packName } = req.body;
+  let { packName } = req.body;
   if (!packName) return res.status(400).json({ error: "packName required" });
+
+  // Extract pack name from Telegram URL
+  const urlMatch = packName.match(/t\.me\/addstickers\/(.+)/);
+  if (urlMatch) packName = urlMatch[1];
+  packName = packName.trim();
 
   try {
     delete packCache[packName];
