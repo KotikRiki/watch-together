@@ -54,6 +54,7 @@ export function Room() {
     if (saved !== null) setShowFloatingMessages(saved === "true");
   }, []);
   const isUserActionRef = useRef(false);
+  const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
 
   useEffect(() => {
     chatExpandedRef.current = chatExpanded;
@@ -158,14 +159,9 @@ export function Room() {
       if (data.videoType) setVideoType(data.videoType as "embed" | "file");
       if (data.isHost) setIsHost(true);
       if (data.hostOnly !== undefined) setHostOnly(data.hostOnly);
-      // Apply current state for new users — delay to let player init
-      if (data.videoUrl && data.currentTime != null) {
-        setTimeout(() => {
-          if (data.currentTime! > 0) videoPlayerRef.current?.seek(data.currentTime!);
-          if (data.isPlaying) {
-            setTimeout(() => videoPlayerRef.current?.play(), 500);
-          }
-        }, 800);
+      // Store state for player ready callback — no hardcoded timeouts
+      if (data.videoUrl && data.currentTime != null && data.currentTime > 0) {
+        pendingStateRef.current = { currentTime: data.currentTime, isPlaying: !!data.isPlaying };
       }
     });
 
@@ -281,14 +277,28 @@ export function Room() {
     }
   }, [playerState, isHost, queue.length]);
 
-  // Heartbeat: send current time every 3 seconds + request watch time every 10s
+  // Apply pending room state when player becomes ready (new user join)
+  useEffect(() => {
+    if (!playerReady) return;
+    const pending = pendingStateRef.current;
+    if (!pending) return;
+    pendingStateRef.current = null;
+
+    videoPlayerRef.current?.seek(pending.currentTime);
+    if (pending.isPlaying) {
+      setTimeout(() => videoPlayerRef.current?.play(), 200);
+    }
+  }, [playerReady]);
+
+  // Heartbeat: send current time every 3-5 seconds + request watch time every 10s
   useEffect(() => {
     if (!socket || !playerReady) return;
 
+    // In landscape, slow down heartbeat to reduce network noise
+    const interval = isLandscape ? 5000 : 3000;
     let tick = 0;
     heartbeatIntervalRef.current = setInterval(() => {
       const time = videoPlayerRef.current?.getCurrentTime() || 0;
-      // Skip sync during ads — don't broadcast play/pause/seek
       if (!adPlaying) {
         socket.emit("heartbeat", code, time, playerState === "playing");
       }
@@ -297,14 +307,14 @@ export function Room() {
       if (tick % 3 === 0) {
         socket.emit("get-watch-time", code);
       }
-    }, 3000);
+    }, interval);
 
     return () => {
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [socket, code, playerReady, playerState, username, adPlaying, videoType]);
+  }, [socket, code, playerReady, playerState, username, adPlaying, videoType, isLandscape]);
 
   const handleLogin = (name: string) => {
     localStorage.setItem("wt_username", name);

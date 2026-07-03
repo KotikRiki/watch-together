@@ -138,7 +138,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           height: "100%",
           width: "100%",
           videoId: videoInfo.id,
-          playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0, disablekb: 1 },
+          playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0, disablekb: 1, fs: 0 },
           events: {
             onReady: () => {
               if (!destroyed) {
@@ -198,10 +198,16 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
               if (e.data === window.YT.PlayerState.PLAYING) {
                 onStateChange?.("playing");
-                if (!syncActiveRef.current) onExternalStateChange?.("playing");
+                if (!syncActiveRef.current) {
+                  onExternalStateChange?.("playing");
+                  onUserAction?.("play", ytPlayerRef.current?.getCurrentTime?.() || 0);
+                }
               } else if (e.data === window.YT.PlayerState.PAUSED) {
                 onStateChange?.("paused");
-                if (!syncActiveRef.current) onExternalStateChange?.("paused");
+                if (!syncActiveRef.current) {
+                  onExternalStateChange?.("paused");
+                  onUserAction?.("pause", ytPlayerRef.current?.getCurrentTime?.() || 0);
+                }
               } else if (e.data === window.YT.PlayerState.ENDED) {
                 onStateChange?.("ended");
               }
@@ -235,8 +241,19 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             onPlayerReady?.();
           }
           if (msg.type === "player:changeState") {
-            if (msg.data?.state === "playing") onStateChange?.("playing");
-            else if (msg.data?.state === "paused") onStateChange?.("paused");
+            if (msg.data?.state === "playing") {
+              onStateChange?.("playing");
+              if (!syncActiveRef.current) {
+                onExternalStateChange?.("playing");
+                onUserAction?.("play", currentTimeRef.current);
+              }
+            } else if (msg.data?.state === "paused") {
+              onStateChange?.("paused");
+              if (!syncActiveRef.current) {
+                onExternalStateChange?.("paused");
+                onUserAction?.("pause", currentTimeRef.current);
+              }
+            }
           }
         } catch {}
       };
@@ -457,8 +474,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           src={getSrc()}
           className="w-full h-full"
           frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         />
         <a
           href={getOriginalUrl()}
