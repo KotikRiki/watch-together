@@ -9,27 +9,24 @@ if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
 export const downloadRouter = Router();
 
-// Track active downloads
-const activeDownloads = new Map<string, { progress: string; pid?: number }>();
+const activeDownloads = new Map<string, { progress: string; clients: Set<any>; pid?: number }>();
 
 downloadRouter.post("/", (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "No URL" });
 
-  // Create deterministic filename from URL hash
   const hash = crypto.createHash("md5").update(url).digest("hex").slice(0, 12);
   const filename = `${hash}.mp4`;
   const outputPath = path.join(downloadDir, filename);
 
-  // Check if already downloaded
   if (fs.existsSync(outputPath)) {
     const stat = fs.statSync(outputPath);
-    if (stat.size > 100000) { // > 100KB = valid file
+    if (stat.size > 100000) {
       return res.json({ url: `/api/download/stream/${filename}`, filename, size: stat.size, cached: true });
     }
   }
 
-  activeDownloads.set(hash, { progress: "starting" });
+  activeDownloads.set(hash, { progress: "0", clients: new Set() });
 
   const args = [
     "--no-playlist",
@@ -43,16 +40,17 @@ downloadRouter.post("/", (req, res) => {
 
   console.log(`Downloading: ${url}`);
   const proc = spawn("yt-dlp", args);
-  activeDownloads.set(hash, { progress: "downloading", pid: proc.pid });
+  const entry = activeDownloads.get(hash)!;
+  entry.pid = proc.pid;
 
   let stderr = "";
 
   proc.stdout.on("data", (data) => {
     const line = data.toString().trim();
-    // Parse yt-dlp progress: [download] 42.3% of ~50MiB at 5MiB/s ETA 00:08
     const match = line.match(/\[download\]\s+([\d.]+)%/);
     if (match) {
-      activeDownloads.set(hash, { progress: `${match[1]}%`, pid: proc.pid });
+      entry.progress = match[1];
+      entry.clients.forEach(client => client.write(`data: ${JSON.stringify({ progress: match[1] })}\n\n`));
     }
   });
 
@@ -62,47 +60,57 @@ downloadRouter.post("/", (req, res) => {
     if (code === 0 && fs.existsSync(outputPath)) {
       const stat = fs.statSync(outputPath);
       console.log(`Downloaded: ${filename} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
-      activeDownloads.set(hash, { progress: "done" });
-      // Cleanup after 5 min
-      setTimeout(() => activeDownloads.delete(hash), 300000);
+      entry.progress = "done";
+      entry.clients.forEach(client => client.write(`data: ${JSON.stringify({ done: true, url: `/api/download/stream/${filename}`, filename, size: stat.size })}\n\n`));
+      setTimeout(() => {
+        entry.clients.forEach(c => c.end());
+        activeDownloads.delete(hash);
+      }, 5000);
     } else {
       console.error("yt-dlp failed:", stderr);
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-      activeDownloads.set(hash, { progress: "error" });
+      const errorMsg = stderr.includes("rutube") ? "RuTube не поддерживается для скачивания" : "Ошибка скачивания";
+      entry.progress = "error";
+      entry.clients.forEach(client => client.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`));
+      setTimeout(() => {
+        entry.clients.forEach(c => c.end());
+        activeDownloads.delete(hash);
+      }, 3000);
     }
   });
 
-  // Poll for completion (max 5 min)
-  const start = Date.now();
-  const poll = setInterval(() => {
-    const entry = activeDownloads.get(hash);
-    if (!entry || entry.progress === "done") {
-      clearInterval(poll);
-      if (fs.existsSync(outputPath)) {
-        const stat = fs.statSync(outputPath);
-        res.json({ url: `/api/download/stream/${filename}`, filename, size: stat.size });
-      } else {
-        res.status(500).json({ error: "Download failed" });
-      }
-    } else if (entry.progress === "error") {
-      clearInterval(poll);
-      res.status(500).json({ error: "Download failed" });
-    } else if (Date.now() - start > 300000) {
-      clearInterval(poll);
-      if (proc.pid) try { process.kill(proc.pid, "SIGKILL"); } catch {}
-      res.status(504).json({ error: "Download timeout" });
-    }
-  }, 1000);
+  res.json({ hash, status: "started" });
 });
 
-// Progress check endpoint
 downloadRouter.get("/progress/:hash", (req, res) => {
-  const entry = activeDownloads.get(req.params.hash);
-  if (!entry) return res.json({ progress: "not_found" });
-  res.json({ progress: entry.progress });
+  const hash = req.params.hash;
+  const entry = activeDownloads.get(hash);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+  });
+
+  if (!entry) {
+    res.write(`data: ${JSON.stringify({ error: "not_found" })}\n\n`);
+    return res.end();
+  }
+
+  entry.clients.add(res);
+
+  res.write(`data: ${JSON.stringify({ progress: entry.progress })}\n\n`);
+
+  if (entry.progress === "done" || entry.progress === "error") {
+    res.end();
+    return;
+  }
+
+  req.on("close", () => {
+    entry.clients.delete(res);
+  });
 });
 
-// Stream downloaded video with range request support
 downloadRouter.get("/stream/:filename", (req, res) => {
   const filePath = path.join(downloadDir, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Not found" });
@@ -133,7 +141,6 @@ downloadRouter.get("/stream/:filename", (req, res) => {
   }
 });
 
-// List downloaded videos
 downloadRouter.get("/list", (_req, res) => {
   const files = fs.readdirSync(downloadDir)
     .filter(f => f.endsWith(".mp4"))

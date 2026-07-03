@@ -13,9 +13,10 @@ interface QueueProps {
   onNext: () => void;
   onDownloadToServer?: (url: string) => void;
   downloading?: boolean;
+  downloadProgress?: string | null;
 }
 
-export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloading }: QueueProps) {
+export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloading, downloadProgress }: QueueProps) {
   const [newUrl, setNewUrl] = useState("");
 
   const handleAdd = () => {
@@ -53,6 +54,21 @@ export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloadi
           </button>
         )}
       </div>
+
+      {downloading && downloadProgress !== null && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-[11px] text-white/50 mb-1">
+            <span>Скачивание...</span>
+            <span>{downloadProgress === "0" ? "Подготовка..." : `${downloadProgress}%`}</span>
+          </div>
+          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all duration-300"
+              style={{ width: downloadProgress === "0" ? "10%" : `${downloadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2 mb-4">
         {queue.length === 0 ? (

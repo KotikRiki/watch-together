@@ -49,6 +49,7 @@ export function Room() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRotateHint, setShowRotateHint] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
   const rotateHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(() => {
     const ua = navigator.userAgent;
@@ -463,6 +464,7 @@ export function Room() {
 
   const handleDownloadToServer = async (url: string) => {
     setDownloading(true);
+    setDownloadProgress("0");
     try {
       const res = await fetch("/api/download", {
         method: "POST",
@@ -470,15 +472,39 @@ export function Room() {
         body: JSON.stringify({ url }),
       });
       const data = await res.json();
-      if (data.url) {
-        emitChangeVideo(data.url, "file");
-      } else {
-        alert(data.error || "Ошибка скачивания");
+      if (data.error) {
+        alert(data.error);
+        setDownloading(false);
+        setDownloadProgress(null);
+        return;
       }
+      const hash = data.hash;
+      const evtSource = new EventSource(`/api/download/progress/${hash}`);
+      evtSource.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.progress) setDownloadProgress(msg.progress);
+        if (msg.done) {
+          evtSource.close();
+          setDownloading(false);
+          setDownloadProgress(null);
+          emitChangeVideo(msg.url, "file");
+        }
+        if (msg.error) {
+          evtSource.close();
+          setDownloading(false);
+          setDownloadProgress(null);
+          alert(msg.error);
+        }
+      };
+      evtSource.onerror = () => {
+        evtSource.close();
+        setDownloading(false);
+        setDownloadProgress(null);
+      };
     } catch (e) {
-      alert("Ошибка скачивания");
-    } finally {
       setDownloading(false);
+      setDownloadProgress(null);
+      alert("Ошибка скачивания");
     }
   };
 
@@ -766,7 +792,7 @@ export function Room() {
             )}
           </div>
 
-          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDownloadToServer={handleDownloadToServer} downloading={downloading} />
+          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDownloadToServer={handleDownloadToServer} downloading={downloading} downloadProgress={downloadProgress} />
         </div>
 
         {/* Chat sidebar */}
