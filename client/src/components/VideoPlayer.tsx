@@ -354,47 +354,16 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
-    const getSrc = () => {
-      switch (videoInfo.type) {
-        case "youtube":
-          return `https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&disablekb=1`;
-        case "rutube":
-          return `https://rutube.ru/play/embed/${videoInfo.id}`;
-        default:
-          return "";
-      }
-    };
-
-    const getOriginalUrl = () => {
-      switch (videoInfo.type) {
-        case "youtube":
-          return `https://www.youtube.com/watch?v=${videoInfo.id}`;
-        case "rutube":
-          return `https://rutube.ru/video/${videoInfo.id}`;
-        default:
-          return videoUrl;
-      }
-    };
-
     if (videoInfo.type === "youtube") {
       return (
         <div className="w-full h-full bg-black overflow-hidden relative">
           <iframe
             ref={iframeRef}
             key={videoInfo.id}
-            src={`https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=1&modestbranding=1&rel=0&fs=1&playsinline=1`}
+            src={`https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&fs=0&playsinline=1&iv_load_policy=3&showinfo=0`}
             className="absolute inset-0 w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            allowFullScreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           />
-          <a
-            href={getOriginalUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute bottom-1 right-1 bg-black/60 backdrop-blur text-white/50 text-[9px] px-1.5 py-0.5 rounded hover:text-white transition-colors z-10"
-          >
-            YouTube ↗
-          </a>
         </div>
       );
     }
@@ -404,19 +373,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         <iframe
           ref={iframeRef}
           key={videoInfo.id}
-          src={getSrc()}
+          src={`https://rutube.ru/play/embed/${videoInfo.id}?no_brand=1&autoplay=0`}
           className="absolute inset-0 w-full h-full"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         />
-        <a
-          href={getOriginalUrl()}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute bottom-1 right-1 bg-black/60 backdrop-blur text-white/50 text-[9px] px-1.5 py-0.5 rounded hover:text-white transition-colors z-10"
-        >
-          RuTube ↗
-        </a>
       </div>
     );
   }
