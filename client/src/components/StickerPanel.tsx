@@ -22,7 +22,7 @@ interface StickerPanelProps {
 }
 
 const STICKER_PACKS = [
-  { name: "by_adel_strimy_ot_ksyuni_chb_archiveADelka_fe0d_by_offstikbot", label: "Адель" },
+  { name: "chb_shajbakova_ot_ksyuni_archiveADelka_053e_by_offstikbot", label: "Адель" },
 ];
 
 export function StickerPanel({ onSendSticker, onClose }: StickerPanelProps) {
