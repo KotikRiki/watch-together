@@ -538,12 +538,10 @@ export function Room() {
 
   const handleSeek = (time: number) => {
     if (!canControl || adPlaying) return;
-    emitVideoAction("seek", time);
+    const t = Math.max(0, time);
+    videoPlayerRef.current?.seek(t);
+    emitVideoAction("seek", t);
     lastSyncEventRef.current = Date.now();
-    syncFromActionRef.current = true;
-    setTimeout(() => { syncFromActionRef.current = false; }, 500);
-    setSyncAction({ action: "seek", time });
-    setTimeout(() => setSyncAction(null), 300);
   };
 
   const handleSync = () => {
