@@ -57,6 +57,8 @@ export function Room() {
   const roomContainerRef = useRef<HTMLDivElement>(null);
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
+  const [landscapeBarsVisible, setLandscapeBarsVisible] = useState(true);
+  const landscapeBarsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUserActionRef = useRef(false);
   const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
   const lastUserActionRef = useRef(0);
@@ -115,9 +117,12 @@ export function Room() {
     if (!container) return;
     try {
       if (document.fullscreenElement) {
-        await document.exitFullscreen();
+        // iOS Safari support
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
       } else {
-        await container.requestFullscreen();
+        if (container.requestFullscreen) await container.requestFullscreen();
+        else if ((container as any).webkitRequestFullscreen) (container as any).webkitRequestFullscreen();
       }
     } catch {}
   };
@@ -149,6 +154,24 @@ export function Room() {
   useEffect(() => {
     playerStateRef.current = playerState;
   }, [playerState]);
+
+  // Auto-hide landscape bars after 3s
+  useEffect(() => {
+    if (isLandscape && !landscapeChatOpen && !showCall) {
+      landscapeBarsTimerRef.current = setTimeout(() => setLandscapeBarsVisible(false), 3000);
+    } else {
+      setLandscapeBarsVisible(true);
+    }
+    return () => { if (landscapeBarsTimerRef.current) clearTimeout(landscapeBarsTimerRef.current); };
+  }, [isLandscape, landscapeChatOpen, showCall, playerState]);
+
+  const resetLandscapeBars = () => {
+    setLandscapeBarsVisible(true);
+    if (landscapeBarsTimerRef.current) clearTimeout(landscapeBarsTimerRef.current);
+    if (isLandscape && !landscapeChatOpen && !showCall) {
+      landscapeBarsTimerRef.current = setTimeout(() => setLandscapeBarsVisible(false), 3000);
+    }
+  };
 
   const {
     socket,
@@ -555,7 +578,7 @@ export function Room() {
             </button>
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/10">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3" fill="white"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </div>
               <h1 className="text-sm font-bold text-white/90 hidden sm:block">Watch Together</h1>
             </div>
@@ -812,7 +835,7 @@ export function Room() {
       <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
         {isLandscape || isFullscreen ? (
           /* LANDSCAPE MODE — full-screen video + floating panels */
-          <div className="relative w-full h-full bg-black">
+          <div className="relative w-full h-full bg-black" onTouchStart={resetLandscapeBars}>
             {/* Video — fills entire screen */}
             <div className="absolute inset-0">
               <VideoPlayer
@@ -841,8 +864,8 @@ export function Room() {
               </div>
             ))}
 
-            {/* Top bar — transparent gradient */}
-            <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/60 to-transparent">
+            {/* Top bar — transparent gradient, auto-hide */}
+            <div className={`absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <div className="flex items-center justify-between px-3 py-2">
                 <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -885,8 +908,8 @@ export function Room() {
               </div>
             </div>
 
-            {/* Bottom bar — controls + time */}
-            <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent">
+            {/* Bottom bar — controls + time, auto-hide */}
+            <div className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   {videoUrl && (
@@ -1082,6 +1105,9 @@ export function Room() {
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60 hover:text-white"}`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+                </button>
+                <button onClick={toggleFullscreen} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
                 </button>
               </div>
               {uploading && (
