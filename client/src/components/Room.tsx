@@ -38,6 +38,8 @@ export function Room() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [reactions, setReactions] = useState<{ id: number; emoji: string; x: number; y: number }[]>([]);
+  const [floatingMessages, setFloatingMessages] = useState<{ id: number; text: string; author: string }[]>([]);
+  const lastMsgCountRef = useRef(0);
   const [syncAction, setSyncAction] = useState<{ action: string; time: number } | null>(null);
   const [showCall, setShowCall] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
@@ -133,7 +135,17 @@ export function Room() {
       setUnreadCount(0);
       if (document.title.startsWith("(")) document.title = document.title.replace(/^\(\d+\)\s*/, "");
     }
-  }, [messages, chatExpanded]);
+    // Show new messages as floating in landscape
+    if (isLandscape && !chatExpanded && messages.length > lastMsgCountRef.current && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.author !== username && !lastMsg.text.startsWith("[sticker]")) {
+        const fm = { id: Date.now(), text: lastMsg.text, author: lastMsg.author };
+        setFloatingMessages(prev => [...prev.slice(-4), fm]);
+        setTimeout(() => setFloatingMessages(prev => prev.filter(m => m.id !== fm.id)), 5000);
+      }
+    }
+    lastMsgCountRef.current = messages.length;
+  }, [messages, chatExpanded, isLandscape, username]);
   const [playerState, setPlayerState] = useState<"playing" | "paused" | "ended">("paused");
   const playerStateRef = useRef<"playing" | "paused" | "ended">("paused");
   const [isHost, setIsHost] = useState(false);
@@ -900,6 +912,29 @@ export function Room() {
             syncAction={syncAction}
           />
 
+          {/* Custom controls overlay for file videos on mobile */}
+          {videoType === "file" && videoUrl && (
+            <div className="absolute inset-0 z-20">
+              {/* Tap to play/pause */}
+              <div className="absolute inset-0 pointer-events-auto" onClick={() => handlePlayPause()} />
+
+              {/* Chat button — always visible, top right */}
+              <div className="absolute top-3 right-3 pointer-events-auto">
+                <button onClick={(e) => { e.stopPropagation(); setChatExpanded(!chatExpanded); }} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  {unreadCount > 0 && !chatExpanded && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                </button>
+              </div>
+
+              {/* Bottom play/pause — always visible */}
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-auto">
+                <button onClick={(e) => { e.stopPropagation(); handlePlayPause(); }} disabled={!canControl} className="w-14 h-14 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white disabled:opacity-30 hover:bg-black/50 transition-all">
+                  {playerState === "playing" ? <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> : <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>}
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Reactions — always on top of everything */}
@@ -909,34 +944,56 @@ export function Room() {
           </div>
         ))}
 
+        {/* Floating chat messages in landscape — bottom right */}
+        {isLandscape && floatingMessages.map((fm) => (
+          <div key={fm.id} className="absolute bottom-16 right-3 z-40 pointer-events-none max-w-[60%] animate-[slideUp_0.3s_ease-out]" style={{ animation: "float-up 5s ease-out forwards" }}>
+            <div className="bg-black/60 backdrop-blur rounded-lg px-3 py-1.5 border border-white/5">
+              <span className="text-white/40 text-[9px] block">{fm.author}</span>
+              <span className="text-white/80 text-[11px]">{fm.text}</span>
+            </div>
+          </div>
+        ))}
+
         {/* ============ LANDSCAPE OVERLAYS ============ */}
         {isLandscape && (
           <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars}>
-            {/* Top bar */}
-            <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
-              <div className="flex items-center justify-between px-3 py-2">
-                <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                  Назад
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-white/40 text-[10px] font-mono bg-white/10 px-2 py-0.5 rounded-full">{code}</span>
-                  {isHost && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">Хост</span>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setLandscapeChatOpen(!landscapeChatOpen)} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all ${landscapeChatOpen ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    {unreadCount > 0 && !landscapeChatOpen && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+            {/* Top bar — hidden for file videos, only chat */}
+            {videoType !== "file" && (
+              <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Назад
                   </button>
-                  <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  </button>
-                  <button onClick={toggleFullscreen} className="w-8 h-8 rounded-full bg-white/10 text-white/60 flex items-center justify-center hover:text-white transition-all">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/40 text-[10px] font-mono bg-white/10 px-2 py-0.5 rounded-full">{code}</span>
+                    {isHost && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">Хост</span>}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setLandscapeChatOpen(!landscapeChatOpen)} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all ${landscapeChatOpen ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      {unreadCount > 0 && !landscapeChatOpen && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                    </button>
+                    <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    </button>
+                    <button onClick={toggleFullscreen} className="w-8 h-8 rounded-full bg-white/10 text-white/60 flex items-center justify-center hover:text-white transition-all">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* File videos: chat button top right only */}
+            {videoType === "file" && (
+              <div className="pointer-events-auto absolute top-3 right-3">
+                <button onClick={() => setChatExpanded(!chatExpanded)} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  {unreadCount > 0 && !chatExpanded && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                </button>
+              </div>
+            )}
 
             {/* Bottom bar */}
             <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>

@@ -316,7 +316,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       );
     }
 
-    // File player
+    // File player — no native controls, custom overlay from Room
     if (isFile) {
       return (
         <div className="w-full h-full bg-black overflow-hidden">
@@ -324,7 +324,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             ref={videoRef}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
-            controls
+            playsInline
             preload="auto"
           />
         </div>
