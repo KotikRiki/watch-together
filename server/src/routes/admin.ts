@@ -75,26 +75,57 @@ adminRouter.get("/stats", async (_req, res) => {
   }
 });
 
-adminRouter.get("/system", (_req, res) => {
+adminRouter.get("/system", async (_req, res) => {
+  const fs = require("fs");
   const mem = process.memoryUsage();
   const cpuPercent = getCpuPercent();
   const processUptime = process.uptime();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const loadAvg = os.loadavg();
+  const cpus = os.cpus();
 
-  let cgroupCpu: number | null = null;
-  let cgroupMem: { used: number; limit: number } | null = null;
-
+  let disk = { total: 0, used: 0, free: 0, percent: 0 };
   try {
-    const fs = require("fs");
-    const cpuStat = fs.readFileSync("/sys/fs/cgroup/cpu.stat", "utf-8");
-    const usageMatch = cpuStat.match(/usage_usec (\d+)/);
-    if (usageMatch) cgroupCpu = parseInt(usageMatch[1]);
+    const df = fs.readFileSync("/proc/mounts", "utf-8");
+    const lines = df.split("\n").filter((l: string) => l.startsWith("/dev/"));
+    if (lines.length > 0) {
+      const stat = fs.statfsSync("/");
+      disk = {
+        total: stat.blocks * stat.bsize,
+        free: stat.bfree * stat.bsize,
+        used: (stat.blocks - stat.bfree) * stat.bsize,
+        percent: Math.round(((stat.blocks - stat.bfree) / stat.blocks) * 100),
+      };
+    }
+  } catch {}
 
-    const memStat = fs.readFileSync("/sys/fs/cgroup/memory.current", "utf-8");
-    cgroupMem = { used: parseInt(memStat.trim()), limit: 0 };
-    try {
-      const memMax = fs.readFileSync("/sys/fs/cgroup/memory.max", "utf-8");
-      cgroupMem.limit = memMax.trim() === "max" ? 0 : parseInt(memMax.trim());
-    } catch {}
+  let network = { rx: 0, tx: 0 };
+  try {
+    const netDev = fs.readFileSync("/proc/net/dev", "utf-8");
+    const lines = netDev.split("\n").slice(2);
+    for (const line of lines) {
+      if (line.includes("lo:")) continue;
+      const parts = line.trim().split(/\s+/);
+      if (parts.length > 9) {
+        network.rx += parseInt(parts[1]) || 0;
+        network.tx += parseInt(parts[9]) || 0;
+      }
+    }
+  } catch {}
+
+  let dbOk = false;
+  try {
+    await query("SELECT 1");
+    dbOk = true;
+  } catch {}
+
+  let nginxOk = false;
+  try {
+    const { execSync } = require("child_process");
+    execSync("systemctl is-active nginx", { timeout: 3000 });
+    nginxOk = true;
   } catch {}
 
   res.json({
@@ -105,10 +136,20 @@ adminRouter.get("/system", (_req, res) => {
       external: mem.external,
       cpuPercent: parseFloat(cpuPercent.toFixed(1)),
     },
-    cgroup: {
-      cpu: cgroupCpu,
-      mem: cgroupMem,
+    system: {
+      hostname: os.hostname(),
+      kernel: os.release(),
+      cpuModel: cpus[0]?.model || "unknown",
+      cpuCores: cpus.length,
+      loadAvg: loadAvg.map((l: number) => parseFloat(l.toFixed(2))),
+      totalMem,
+      usedMem,
+      freeMem,
+      memPercent: Math.round((usedMem / totalMem) * 100),
     },
+    disk,
+    network,
+    services: { db: dbOk, nginx: nginxOk },
     platform: os.platform(),
     arch: os.arch(),
     nodeVersion: process.version,

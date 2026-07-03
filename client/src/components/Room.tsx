@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
-import { useTheme } from "../hooks/useTheme";
 import { VideoPlayer } from "./VideoPlayer";
 import type { VideoPlayerHandle } from "./VideoPlayer";
 import { Chat } from "./Chat";
@@ -28,7 +27,6 @@ const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉
 export function Room() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { theme, toggle: toggleTheme } = useTheme();
   const [username, setUsername] = useState<string | null>(() => localStorage.getItem("wt_username"));
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoType, setVideoType] = useState<"embed" | "file">("embed");
@@ -445,9 +443,7 @@ export function Room() {
             <span>{users} в комнате</span>
             {isHost && <span className="text-yellow-400">👑</span>}
             {hostOnly && <span className="text-orange-400">🔒</span>}
-            <button onClick={toggleTheme} className="text-lg p-1 hover:bg-gray-800 rounded transition-colors" title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}>
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
+
             <span className={isConnected ? "text-green-500" : "text-red-500"}>{isConnected ? "●" : "○"}</span>
           </div>
         </div>

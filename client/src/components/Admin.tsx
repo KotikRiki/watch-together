@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useTheme } from "../hooks/useTheme";
 
 interface Stats {
   totalRooms: number;
@@ -16,7 +15,13 @@ interface Stats {
 
 interface SystemInfo {
   process: { rss: number; heapUsed: number; heapTotal: number; external: number; cpuPercent: number };
-  cgroup: { cpu: number | null; mem: { used: number; limit: number } | null };
+  system: {
+    hostname: string; kernel: string; cpuModel: string; cpuCores: number;
+    loadAvg: number[]; totalMem: number; usedMem: number; freeMem: number; memPercent: number;
+  };
+  disk: { total: number; used: number; free: number; percent: number };
+  network: { rx: number; tx: number };
+  services: { db: boolean; nginx: boolean };
   platform: string;
   arch: string;
   nodeVersion: string;
@@ -44,7 +49,6 @@ interface VideoHistoryItem {
 type Tab = "stats" | "rooms" | "history" | "videoHistory" | "watchTime" | "system" | "stickers";
 
 export function Admin() {
-  const { theme, toggle } = useTheme();
   const [auth, setAuth] = useState<string | null>(() => localStorage.getItem("wt_admin_auth"));
   const [tab, setTab] = useState<Tab>("stats");
   const [stats, setStats] = useState<Stats | null>(null);
@@ -315,9 +319,6 @@ export function Admin() {
           <h1 className="text-lg font-bold">Админ-панель</h1>
           <div className="flex items-center gap-3">
             <a href="/" className="text-gray-400 hover:text-white text-sm">← На сайт</a>
-            <button onClick={toggle} className="text-lg p-1 hover:bg-gray-800 rounded transition-colors" title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}>
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
             <button onClick={() => setShowReset(true)} className="text-red-400 hover:text-red-300 text-sm border border-red-800 px-2 py-1 rounded">Сброс</button>
             <button onClick={logout} className="text-gray-400 hover:text-white text-sm">Выйти</button>
           </div>
@@ -675,14 +676,35 @@ export function Admin() {
             )}
 
             <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">Система</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">Хост:</span> <span className="text-white">{systemInfo.system.hostname}</span></div>
+                <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">Ядро:</span> <span className="text-white">{systemInfo.system.kernel}</span></div>
+                <div className="bg-gray-800 rounded-lg p-2 col-span-2"><span className="text-gray-400">CPU:</span> <span className="text-white">{systemInfo.system.cpuModel} ({systemInfo.system.cpuCores} cores)</span></div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-white font-semibold">Процесс Node.js</h3>
+                <h3 className="text-white font-semibold">CPU</h3>
                 <span className="text-green-400 text-xs animate-pulse">● Live</span>
               </div>
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-400">CPU (процесс)</span>
+                    <span className="text-gray-400">Load Average (1/5/15 мин)</span>
+                    <span className={`font-bold ${systemInfo.system.loadAvg[0] > systemInfo.system.cpuCores * 0.8 ? "text-red-400" : systemInfo.system.loadAvg[0] > systemInfo.system.cpuCores * 0.5 ? "text-yellow-400" : "text-green-400"}`}>
+                      {systemInfo.system.loadAvg.join(" / ")}
+                    </span>
+                  </div>
+                  <div className="bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${systemInfo.system.loadAvg[0] > systemInfo.system.cpuCores * 0.8 ? "bg-red-500" : systemInfo.system.loadAvg[0] > systemInfo.system.cpuCores * 0.5 ? "bg-yellow-500" : "bg-green-500"}`}
+                      style={{ width: `${Math.min(100, (systemInfo.system.loadAvg[0] / systemInfo.system.cpuCores) * 100)}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-400">CPU Node.js (процесс)</span>
                     <span className={systemInfo.process.cpuPercent > 50 ? "text-red-400" : systemInfo.process.cpuPercent > 20 ? "text-yellow-400" : "text-green-400"}>
                       {systemInfo.process.cpuPercent}%
                     </span>
@@ -692,36 +714,74 @@ export function Admin() {
                       style={{ width: `${Math.min(100, systemInfo.process.cpuPercent)}%` }} />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">RAM</h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-400">Системная</span>
+                    <span className="text-white">{fmtSize(systemInfo.system.usedMem)} / {fmtSize(systemInfo.system.totalMem)} ({systemInfo.system.memPercent}%)</span>
+                  </div>
+                  <div className="bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${systemInfo.system.memPercent > 85 ? "bg-red-500" : systemInfo.system.memPercent > 60 ? "bg-yellow-500" : "bg-green-500"}`}
+                      style={{ width: `${Math.min(100, systemInfo.system.memPercent)}%` }} />
+                  </div>
+                </div>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-gray-800 rounded-lg p-2"><p className="text-gray-400 text-xs">RSS</p><p className="text-white font-bold text-sm">{fmtSize(systemInfo.process.rss)}</p></div>
+                  <div className="bg-gray-800 rounded-lg p-2"><p className="text-gray-400 text-xs">RSS (процесс)</p><p className="text-white font-bold text-sm">{fmtSize(systemInfo.process.rss)}</p></div>
                   <div className="bg-gray-800 rounded-lg p-2"><p className="text-gray-400 text-xs">Heap</p><p className="text-orange-400 font-bold text-sm">{fmtSize(systemInfo.process.heapUsed)} / {fmtSize(systemInfo.process.heapTotal)}</p></div>
                   <div className="bg-gray-800 rounded-lg p-2"><p className="text-gray-400 text-xs">External</p><p className="text-cyan-400 font-bold text-sm">{fmtSize(systemInfo.process.external)}</p></div>
                 </div>
               </div>
             </div>
 
-            {systemInfo.cgroup.mem && (
-              <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                <h3 className="text-white font-semibold mb-3">Контейнер</h3>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-400">RAM контейнера</span>
-                      <span className="text-white">{fmtSize(systemInfo.cgroup.mem.used)} / {systemInfo.cgroup.mem.limit ? fmtSize(systemInfo.cgroup.mem.limit) : "N/A"}</span>
-                    </div>
-                    {systemInfo.cgroup.mem.limit > 0 && (
-                      <div className="bg-gray-800 rounded-full h-2.5 overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, (systemInfo.cgroup.mem.used / systemInfo.cgroup.mem.limit) * 100)}%` }} />
-                      </div>
-                    )}
-                  </div>
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">Диск</h3>
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-400">/</span>
+                  <span className="text-white">{fmtSize(systemInfo.disk.used)} / {fmtSize(systemInfo.disk.total)} ({systemInfo.disk.percent}%)</span>
+                </div>
+                <div className="bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${systemInfo.disk.percent > 90 ? "bg-red-500" : systemInfo.disk.percent > 70 ? "bg-yellow-500" : "bg-blue-500"}`}
+                    style={{ width: `${Math.min(100, systemInfo.disk.percent)}%` }} />
                 </div>
               </div>
-            )}
+            </div>
 
             <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-              <h3 className="text-white font-semibold mb-3">Инфо</h3>
+              <h3 className="text-white font-semibold mb-3">Сеть</h3>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-gray-400 text-xs mb-1">↓ Загрузка (RX)</p>
+                  <p className="text-green-400 font-bold text-lg">{fmtSize(systemInfo.network.rx)}</p>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <p className="text-gray-400 text-xs mb-1">↑ Отдача (TX)</p>
+                  <p className="text-blue-400 font-bold text-lg">{fmtSize(systemInfo.network.tx)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">Сервисы</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-800 rounded-lg p-2 flex items-center gap-2">
+                  <span className={systemInfo.services.db ? "text-green-400" : "text-red-400"}>{systemInfo.services.db ? "●" : "●"}</span>
+                  <span className="text-gray-400">PostgreSQL</span>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-2 flex items-center gap-2">
+                  <span className={systemInfo.services.nginx ? "text-green-400" : "text-red-400"}>{systemInfo.services.nginx ? "●" : "●"}</span>
+                  <span className="text-gray-400">Nginx</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h3 className="text-white font-semibold mb-3">Процесс</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">Платформа:</span> <span className="text-white">{systemInfo.platform} ({systemInfo.arch})</span></div>
                 <div className="bg-gray-800 rounded-lg p-2"><span className="text-gray-400">Node:</span> <span className="text-white">{systemInfo.nodeVersion}</span></div>
