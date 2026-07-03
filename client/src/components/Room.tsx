@@ -47,7 +47,8 @@ export function Room() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
+  const [showRotateHint, setShowRotateHint] = useState(false);
+  const rotateHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(() => {
     const ua = navigator.userAgent;
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
@@ -99,8 +100,6 @@ export function Room() {
     const onFsChange = () => {
       const el = document.fullscreenElement;
       setIsFullscreen(!!el);
-      // If native fullscreen exited, also exit CSS fullscreen
-      if (!el && isMobileFullscreen) setIsMobileFullscreen(false);
       // If an iframe captured fullscreen (YouTube/RuTube), force exit it
       if (el && el.tagName === "IFRAME") {
         document.exitFullscreen().catch(() => {});
@@ -113,38 +112,26 @@ export function Room() {
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, [isMobileFullscreen]);
+  }, []);
 
   const toggleFullscreen = async () => {
     if (isMobile) {
-      // CSS-based fullscreen for mobile — works on iOS Safari
-      setIsMobileFullscreen((prev) => {
-        const next = !prev;
-        // Try native fullscreen too for Android
-        if (next) {
-          const el = roomContainerRef.current;
-          if (el) {
-            (el.requestFullscreen?.() || (el as any).webkitRequestFullscreen?.()).catch(() => {});
-          }
-        } else {
-          if (document.fullscreenElement) {
-            document.exitFullscreen?.().catch(() => {});
-          }
-        }
-        return next;
-      });
-    } else {
-      // Desktop — native fullscreen
-      const container = desktopContainerRef.current;
-      if (!container) return;
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        } else {
-          await container.requestFullscreen();
-        }
-      } catch {}
+      // Show "rotate your phone" hint
+      setShowRotateHint(true);
+      if (rotateHintTimerRef.current) clearTimeout(rotateHintTimerRef.current);
+      rotateHintTimerRef.current = setTimeout(() => setShowRotateHint(false), 3000);
+      return;
     }
+    // Desktop — native fullscreen
+    const container = desktopContainerRef.current;
+    if (!container) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await container.requestFullscreen();
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -852,10 +839,10 @@ export function Room() {
       </div>
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${(isLandscape || isMobileFullscreen) ? "top-0" : "top-[52px]"}`}>
+      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${isLandscape ? "top-0" : "top-[52px]"}`}>
 
         {/* SINGLE VideoPlayer — always mounted, never remounts */}
-        <div className={`${isLandscape || isMobileFullscreen ? "absolute inset-0 z-10" : "relative flex-1 min-h-0 bg-black"}`}>
+        <div className={`${isLandscape ? "absolute inset-0 z-10" : "relative flex-1 min-h-0 bg-black"}`}>
           <VideoPlayer
             ref={videoPlayerRef}
             videoUrl={videoUrl}
@@ -876,19 +863,19 @@ export function Room() {
 
           {/* Reactions — always on video */}
           {reactions.map((r) => (
-            <div key={r.id} className={`absolute text-3xl pointer-events-none ${isLandscape || isMobileFullscreen ? "z-30" : ""}`} style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
+            <div key={r.id} className={`absolute text-3xl pointer-events-none ${isLandscape ? "z-30" : ""}`} style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
               {r.emoji}
             </div>
           ))}
         </div>
 
-        {/* ============ LANDSCAPE / CSS-FULLSCREEN OVERLAYS ============ */}
-        {(isLandscape || isMobileFullscreen) && (
+        {/* ============ LANDSCAPE OVERLAYS ============ */}
+        {isLandscape && (
           <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars}>
             {/* Top bar */}
             <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
               <div className="flex items-center justify-between px-3 py-2">
-                <button onClick={() => { if (isMobileFullscreen) setIsMobileFullscreen(false); else navigate("/"); }} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
+                <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                   Назад
                 </button>
@@ -997,7 +984,7 @@ export function Room() {
         )}
 
         {/* ============ PORTRAIT OVERLAYS ============ */}
-        {!isLandscape && !isMobileFullscreen && (
+        {!isLandscape && (
           <>
             {/* Floating badges — top */}
             <div className="absolute top-2 left-2 right-2 flex items-start justify-between pointer-events-none z-10">
@@ -1082,6 +1069,20 @@ export function Room() {
               </div>
             )}
           </>
+        )}
+
+        {/* Rotate phone hint */}
+        {showRotateHint && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" onClick={() => setShowRotateHint(false)}>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative animate-[phoneRotate_1.5s_ease-in-out_infinite]">
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
+              </div>
+              <span className="text-white/80 text-sm font-medium">Переверни телефон</span>
+              <span className="text-white/40 text-xs">для полноэкранного просмотра</span>
+            </div>
+          </div>
         )}
 
         {/* VideoCall — when shown */}
@@ -1278,6 +1279,14 @@ export function Room() {
       </div>
 
       <style>{`
+        @keyframes fadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes phoneRotate {
+          0%, 100% { transform: rotate(0deg); }
+          50% { transform: rotate(90deg); }
+        }
         @keyframes float-up {
           0% { opacity:1; transform:translateY(0) scale(1); }
           100% { opacity:0; transform:translateY(-100px) scale(1.5); }
