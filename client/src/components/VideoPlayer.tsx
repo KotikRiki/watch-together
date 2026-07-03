@@ -52,6 +52,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.innerWidth < 1024 && "ontouchstart" in window);
 
     // HTML5 video player for uploaded files
     useEffect(() => {
@@ -365,6 +366,25 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             className="absolute inset-0 w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           />
+        </div>
+      );
+    }
+
+    if (videoInfo.type === "rutube" && isMobile) {
+      return (
+        <div className="w-full h-full bg-[#12121a] flex flex-col items-center justify-center gap-4 p-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+          <p className="text-white/60 text-sm text-center">RuTube не поддерживается на мобильных</p>
+          <a
+            href={`https://rutube.ru/video/${videoInfo.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+          >
+            Открыть в RuTube ↗
+          </a>
         </div>
       );
     }
