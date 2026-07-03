@@ -356,6 +356,19 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     }
 
     if (videoInfo.type === "youtube") {
+      return (
+        <div className="w-full h-full bg-black overflow-hidden relative">
+          <iframe
+            ref={iframeRef}
+            key={videoInfo.id}
+            src={`https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&fs=0&playsinline=1&iv_load_policy=3&showinfo=0`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="w-full h-full bg-black overflow-hidden relative">
         <iframe
@@ -366,32 +379,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         />
-      </div>
-    );
-    }
-
-    return (
-      <div className="w-full h-full bg-black overflow-hidden relative">
-        <iframe
-          ref={iframeRef}
-          key={videoInfo.id}
-          src={`https://rutube.ru/play/embed/${videoInfo.id}?no_brand=1&autoplay=0`}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        />
-        <button
-          onClick={() => {
-            iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
-            onUserAction?.("play", currentTimeRef.current);
-          }}
-          className="absolute inset-0 z-10 flex items-center justify-center"
-          aria-label="Play"
-        >
-          <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-opacity hover:bg-black/50">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
-        </button>
       </div>
     );
   }
