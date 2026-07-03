@@ -95,6 +95,7 @@ setupSocketHandlers(io);
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 function startServer() {
+  server.timeout = 86400000;
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });

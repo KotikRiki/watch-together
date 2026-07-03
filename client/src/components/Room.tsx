@@ -777,7 +777,7 @@ export function Room() {
                   const target = e.target as HTMLFormElement;
                   const urlInput = target.elements.namedItem("videoUrlD") as HTMLInputElement;
                   if (urlInput.value.trim()) {
-                    emitChangeVideo(urlInput.value.trim(), "embed");
+                    emitChangeVideo(urlInput.value.trim(), /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(urlInput.value.trim()) ? "file" : "embed");
                     urlInput.value = "";
                   }
                 }}
@@ -1112,7 +1112,7 @@ export function Room() {
             {/* No video — show URL input */}
             {!videoUrl && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 z-10">
-                <form onSubmit={(e) => { e.preventDefault(); const target = e.target as HTMLFormElement; const urlInput = target.elements.namedItem("videoUrlM") as HTMLInputElement; if (urlInput.value.trim()) { emitChangeVideo(urlInput.value.trim(), "embed"); urlInput.value = ""; } }} className="flex gap-2">
+                <form onSubmit={(e) => { e.preventDefault(); const target = e.target as HTMLFormElement; const urlInput = target.elements.namedItem("videoUrlM") as HTMLInputElement; if (urlInput.value.trim()) { emitChangeVideo(urlInput.value.trim(), /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(urlInput.value.trim()) ? "file" : "embed"); urlInput.value = ""; } }} className="flex gap-2">
                   <input name="videoUrlM" type="text" placeholder="Вставьте ссылку на видео..." className="flex-1 bg-white/10 backdrop-blur text-white rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-white/50" />
                   <button type="submit" className="bg-blue-600 text-white px-4 py-2.5 rounded-full text-sm font-semibold shrink-0">▶</button>
                 </form>
