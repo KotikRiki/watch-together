@@ -55,6 +55,7 @@ export function Room() {
   }, []);
   const isUserActionRef = useRef(false);
   const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
+  const lastUserActionRef = useRef(0);
 
   useEffect(() => {
     chatExpandedRef.current = chatExpanded;
@@ -81,9 +82,20 @@ export function Room() {
     };
   }, []);
 
-  // Fullscreen tracking
+  // Fullscreen tracking — block iframe hijacking
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const onFsChange = () => {
+      const el = document.fullscreenElement;
+      setIsFullscreen(!!el);
+      // If an iframe captured fullscreen (YouTube/RuTube), force exit it
+      if (el && el.tagName === "IFRAME") {
+        document.exitFullscreen().catch(() => {});
+        // After exit, apply our container fullscreen
+        setTimeout(() => {
+          roomContainerRef.current?.requestFullscreen().catch(() => {});
+        }, 100);
+      }
+    };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
@@ -180,6 +192,9 @@ export function Room() {
       if (data.userId === socket?.id) return;
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
       if (sinceExternal < 1500) return;
+      // Skip heartbeat correction for 2s after any user action
+      const sinceUserAction = Date.now() - lastUserActionRef.current;
+      if (sinceUserAction < 2000) return;
 
       if (videoType === "file") {
         videoPlayerRef.current?.smoothCorrect(data.time, data.isPlaying);
@@ -282,6 +297,9 @@ export function Room() {
     if (!playerReady) return;
     const pending = pendingStateRef.current;
     if (!pending) return;
+    // Don't apply if user already started interacting
+    const sinceUserAction = Date.now() - lastUserActionRef.current;
+    if (sinceUserAction < 2000) { pendingStateRef.current = null; return; }
     pendingStateRef.current = null;
 
     videoPlayerRef.current?.seek(pending.currentTime);
@@ -419,6 +437,7 @@ export function Room() {
     emitVideoAction(newAction, time);
     lastSyncEventRef.current = Date.now();
     lastExternalChangeRef.current = Date.now();
+    lastUserActionRef.current = Date.now();
     syncFromActionRef.current = true;
     setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: newAction, time });
@@ -458,6 +477,7 @@ export function Room() {
     emitVideoAction(newState === "playing" ? "play" : "pause", time);
     lastSyncEventRef.current = Date.now();
     lastExternalChangeRef.current = Date.now();
+    lastUserActionRef.current = Date.now();
   };
 
   const handleUserAction = (action: "play" | "pause" | "seek", time: number) => {
@@ -468,6 +488,7 @@ export function Room() {
     emitVideoAction(action, time);
     lastSyncEventRef.current = Date.now();
     lastExternalChangeRef.current = Date.now();
+    lastUserActionRef.current = Date.now();
     syncFromActionRef.current = true;
     setTimeout(() => { syncFromActionRef.current = false; }, 500);
   };
@@ -785,13 +806,13 @@ export function Room() {
             )}
 
             {/* Minimal controls overlay */}
-            <div className="absolute bottom-2 right-2 flex items-center gap-1.5 z-20">
+            <div className="absolute bottom-2 right-2 flex items-center gap-1 z-20">
               {adPlaying && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold animate-pulse">📺</span>}
               <span className="text-white/60 text-[10px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
-              <button onClick={() => setChatExpanded(true)} className="bg-white/15 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
-                💬{unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+              <button onClick={() => setChatExpanded(true)} className="bg-white/10 backdrop-blur text-white/50 w-6 h-6 rounded-full flex items-center justify-center text-[10px] hover:text-white">
+                💬
               </button>
-              <button onClick={toggleFullscreen} className="bg-white/15 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
+              <button onClick={toggleFullscreen} className="bg-white/10 backdrop-blur text-white/50 w-6 h-6 rounded-full flex items-center justify-center text-[10px] hover:text-white">
                 {isFullscreen ? "⊡" : "⊞"}
               </button>
             </div>
