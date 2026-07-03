@@ -47,6 +47,13 @@ export function Room() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    const ua = navigator.userAgent;
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.innerWidth < 1024;
+    const isMobileUA = /Android|iPhone|iPad|iPod|Telegram/i.test(ua);
+    return isSmallScreen || (isTouchDevice && isMobileUA);
+  });
   const roomContainerRef = useRef<HTMLDivElement>(null);
   const [showFloatingMessages, setShowFloatingMessages] = useState(true);
   useEffect(() => {
@@ -66,12 +73,17 @@ export function Room() {
     return () => { document.title = "Watch Together"; };
   }, []);
 
-  // Orientation detection
+  // Orientation detection + mobile recheck
   useEffect(() => {
     const check = () => {
       const ls = window.matchMedia("(orientation: landscape)").matches;
       const wide = window.innerWidth > window.innerHeight;
       setIsLandscape(ls || wide);
+      const ua = navigator.userAgent;
+      const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth < 1024;
+      const isMobileUA = /Android|iPhone|iPad|iPod|Telegram/i.test(ua);
+      setIsMobile(isSmallScreen || (isTouchDevice && isMobileUA));
     };
     check();
     window.addEventListener("resize", check);
@@ -545,7 +557,7 @@ export function Room() {
       </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
-      <div ref={roomContainerRef} className="hidden lg:flex lg:h-[calc(100vh-72px)] gap-0">
+      <div ref={roomContainerRef} className={`${isMobile ? "hidden" : "flex"} h-[calc(100vh-72px)] gap-0`}>
         {/* Video column — takes all available space */}
         <div className="flex-1 flex flex-col min-w-0 p-4 pr-2 gap-3">
           {/* Video player with sticker overlay */}
@@ -766,7 +778,7 @@ export function Room() {
       </div>
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className={`lg:hidden fixed inset-0 bg-black flex flex-col transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
+      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-black flex flex-col" : "hidden"} transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
         {isLandscape || isFullscreen ? (
           /* LANDSCAPE MODE — minimal UI, video fills screen */
           <div className="relative w-full h-full">
