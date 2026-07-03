@@ -93,6 +93,23 @@ export function CreateRoom() {
         <div className="mt-6 text-center text-gray-500 text-sm">
           YouTube • RuTube • Загрузка файлов
         </div>
+
+        {/* Force update button — temporary for testing */}
+        <div className="mt-4 text-center">
+          <button
+            onClick={async () => {
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const r of regs) await r.unregister();
+              }
+              caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+              window.location.reload();
+            }}
+            className="text-gray-600 text-[10px] hover:text-gray-400 transition-colors underline"
+          >
+            ⚡ Принудительно обновить SW
+          </button>
+        </div>
       </div>
     </div>
   );
