@@ -55,11 +55,7 @@ export function Room() {
     return isSmallScreen || (isTouchDevice && isMobileUA);
   });
   const roomContainerRef = useRef<HTMLDivElement>(null);
-  const [showFloatingMessages, setShowFloatingMessages] = useState(true);
-  useEffect(() => {
-    const saved = localStorage.getItem("wt_floating_msgs");
-    if (saved !== null) setShowFloatingMessages(saved === "true");
-  }, []);
+  const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
   const isUserActionRef = useRef(false);
   const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
   const lastUserActionRef = useRef(0);
@@ -507,10 +503,13 @@ export function Room() {
 
   if (!username) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-gray-800">
-          <h1 className="text-2xl font-bold text-white mb-2 text-center">Войти в комнату</h1>
-          <p className="text-gray-400 text-center mb-6">
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-30%] left-[-20%] w-[60%] h-[60%] bg-blue-600/5 rounded-full blur-[120px]" />
+        </div>
+        <div className="bg-[#12121a] rounded-2xl p-6 w-full max-w-sm border border-white/5 shadow-2xl shadow-black/50 relative z-10">
+          <h1 className="text-xl font-bold text-white mb-1 text-center">Войти в комнату</h1>
+          <p className="text-gray-500 text-center mb-6 text-sm">
             Код: <span className="text-blue-400 font-mono font-bold">{code}</span>
           </p>
           <form
@@ -525,10 +524,10 @@ export function Room() {
               name="username"
               type="text"
               placeholder="Ваше имя..."
-              className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-white/5 text-white rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:bg-white/[0.07] placeholder:text-gray-600 transition-all"
               autoFocus
             />
-            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+            <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 rounded-xl font-semibold text-sm hover:from-blue-500 hover:to-blue-400 transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98]">
               Войти
             </button>
           </form>
@@ -537,24 +536,24 @@ export function Room() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <header className="bg-gray-900 border-b border-gray-800 p-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex flex-col">
+        {/* Header */}
+        <header className="h-[52px] border-b border-white/5 flex items-center px-4 shrink-0 bg-[#0a0a0f]/80 backdrop-blur-xl">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/")} className="text-gray-400 hover:text-white text-sm">← Назад</button>
-            <h1 className="text-lg font-bold hidden sm:block">Watch Together</h1>
+            <button onClick={() => navigate("/")} className="text-white/40 hover:text-white text-sm transition-colors">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <h1 className="text-sm font-semibold text-white/80 hidden sm:block">Watch Together</h1>
           </div>
-          <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-400">
-            <span className="font-mono bg-gray-800 px-2 py-1 rounded">{code}</span>
+          <div className="flex items-center gap-3 text-xs text-white/40 ml-auto">
+            <span className="font-mono bg-white/5 px-2 py-0.5 rounded-full">{code}</span>
             <span>{users} в комнате</span>
-            {isHost && <span className="text-yellow-400">👑</span>}
-            {hostOnly && <span className="text-orange-400">🔒</span>}
-
-            <span className={isConnected ? "text-green-500" : "text-red-500"}>{isConnected ? "●" : "○"}</span>
+            {isHost && <span className="text-yellow-400/80 text-[10px] bg-yellow-500/10 px-1.5 py-0.5 rounded-full">Хост</span>}
+            {hostOnly && <span className="text-orange-400/80 text-[10px] bg-orange-500/10 px-1.5 py-0.5 rounded-full">Ограничен</span>}
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
       <div ref={roomContainerRef} className={`${isMobile ? "hidden" : "flex"} h-[calc(100vh-72px)] gap-0`}>
@@ -633,12 +632,12 @@ export function Room() {
               {adPlaying && (
                 <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold animate-pulse">📺 Реклама</span>
               )}
-              <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors">
-                {playerState === "playing" ? "⏸ Пауза" : "▶ Играть"}
+              <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-white/10 hover:bg-white/15 disabled:opacity-30 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95">
+                {playerState === "playing" ? "Пауза" : "Играть"}
               </button>
-              <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors">⏪ -10с</button>
-              <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors">⏩ +10с</button>
-              <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-purple-600/50 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm transition-colors opacity-60 hover:opacity-100" title="Синхронизировать всех участников">🔄 Синхр.</button>
+              <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/70 px-3 py-1.5 rounded-lg text-sm transition-all">-10с</button>
+              <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/70 px-3 py-1.5 rounded-lg text-sm transition-all">+10с</button>
+              <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 px-3 py-1.5 rounded-lg text-sm transition-all" title="Синхронизировать всех участников">Синхр.</button>
               <button
                 onClick={() => {
                   const newAd = !adPlaying;
@@ -652,16 +651,16 @@ export function Room() {
                   if (newAd) socket?.emit("ad-started", code);
                   else socket?.emit("ad-ended", code);
                 }}
-                className={`text-xs px-2 py-1 rounded-lg font-semibold transition-colors ${adPlaying ? "bg-red-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"}`}
+                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70"}`}
               >
-                📺 {adPlaying ? "Реклама идёт" : "Реклама"}
+                {adPlaying ? "Реклама" : "Реклама"}
               </button>
-              <span className="text-xs text-gray-400 ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
+              <span className="text-xs text-white/40 ml-auto font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
             </div>
           )}
 
           {/* Upload / URL input */}
-          <div className="bg-gray-900 rounded-lg p-3">
+          <div className="bg-[#12121a] rounded-xl p-3 border border-white/5">
             <div className="flex items-center gap-3">
               <label className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg px-4 py-2 cursor-pointer transition-colors font-semibold shrink-0">
                 📁 Файл
@@ -778,82 +777,209 @@ export function Room() {
       </div>
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-black flex flex-col" : "hidden"} transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
+      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
         {isLandscape || isFullscreen ? (
-          /* LANDSCAPE MODE — minimal UI, video fills screen */
-          <div className="relative w-full h-full">
-            <VideoPlayer
-              ref={videoPlayerRef}
-              videoUrl={videoUrl}
-              videoType={videoType}
-              onTimeUpdate={() => {}}
-              onStateChange={(state) => setPlayerState(state)}
-              onPlayerReady={() => setPlayerReady(true)}
-              onAdStateChange={(isAd) => {
-                if (manualAdRef.current) return;
-                setAdPlaying(isAd);
-                if (isAd) socket?.emit("ad-started", code);
-                else socket?.emit("ad-ended", code);
-              }}
-              onExternalStateChange={handleExternalStateChange}
-              onUserAction={handleUserAction}
-              syncAction={syncAction}
-            />
+          /* LANDSCAPE MODE — full-screen video + floating panels */
+          <div className="relative w-full h-full bg-black">
+            {/* Video — fills entire screen */}
+            <div className="absolute inset-0">
+              <VideoPlayer
+                ref={videoPlayerRef}
+                videoUrl={videoUrl}
+                videoType={videoType}
+                onTimeUpdate={() => {}}
+                onStateChange={(state) => setPlayerState(state)}
+                onPlayerReady={() => setPlayerReady(true)}
+                onAdStateChange={(isAd) => {
+                  if (manualAdRef.current) return;
+                  setAdPlaying(isAd);
+                  if (isAd) socket?.emit("ad-started", code);
+                  else socket?.emit("ad-ended", code);
+                }}
+                onExternalStateChange={handleExternalStateChange}
+                onUserAction={handleUserAction}
+                syncAction={syncAction}
+              />
+            </div>
+
+            {/* Emoji reactions overlay */}
             {reactions.map((r) => (
-              <div key={r.id} className="absolute text-3xl pointer-events-none" style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
+              <div key={r.id} className="absolute text-3xl pointer-events-none z-30" style={{ left: `${r.x}%`, top: `${r.y}%`, animation: "float-up 3s ease-out forwards" }}>
                 {r.emoji}
               </div>
             ))}
 
-            {/* Floating messages — top right, semi-transparent */}
-            {showFloatingMessages && (
-              <div className="absolute top-2 right-2 w-56 flex flex-col gap-1 pointer-events-none z-10">
-                {messages.slice(-3).map((msg, i) => (
-                  <div key={msg.id || i} className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 text-[11px] animate-[floatMsg_6s_ease-out_forwards]" style={{ animationDelay: `${i * 0.1}s` }}>
-                    <span className="text-blue-400 font-semibold">{msg.author}: </span>
-                    <span className="text-white/90">{msg.text.startsWith("[sticker]") ? "🖼" : msg.text}</span>
-                  </div>
-                ))}
+            {/* Top bar — transparent gradient */}
+            <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/60 to-transparent">
+              <div className="flex items-center justify-between px-3 py-2">
+                <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  Назад
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-white/40 text-[10px] font-mono bg-white/10 px-2 py-0.5 rounded-full">{code}</span>
+                  {isHost && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">Хост</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  {/* Chat toggle */}
+                  <button
+                    onClick={() => setLandscapeChatOpen(!landscapeChatOpen)}
+                    className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-all ${landscapeChatOpen ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white/60 hover:text-white"}`}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    {unreadCount > 0 && !landscapeChatOpen && (
+                      <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                    )}
+                  </button>
+                  {/* Call toggle */}
+                  <button
+                    onClick={() => setShowCall(!showCall)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  </button>
+                  {/* Fullscreen toggle */}
+                  <button
+                    onClick={toggleFullscreen}
+                    className="w-8 h-8 rounded-full bg-white/10 text-white/60 flex items-center justify-center hover:text-white transition-all"
+                  >
+                    {isFullscreen ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom bar — controls + time */}
+            <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/60 to-transparent">
+              <div className="flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {videoUrl && (
+                    <>
+                      <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
+                        {playerState === "playing" ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        )}
+                      </button>
+                      <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                      </button>
+                      <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {adPlaying && <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium animate-pulse">Реклама</span>}
+                  <span className="text-white/50 text-[11px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating chat panel — slides from right */}
+            {landscapeChatOpen && (
+              <div className="absolute top-0 right-0 bottom-0 w-80 max-w-[85vw] z-30 flex flex-col bg-[#0f0f18]/95 backdrop-blur-xl border-l border-white/5 animate-[slideInRight_0.2s_ease-out]">
+                {/* Chat header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+                  <span className="text-white/70 text-sm font-medium">Чат</span>
+                  <button onClick={() => setLandscapeChatOpen(false)} className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0 space-y-2">
+                  {messages.length === 0 && (
+                    <p className="text-gray-600 text-xs text-center mt-12">Пока нет сообщений</p>
+                  )}
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"}`}>
+                      <span className="text-[10px] text-gray-500 mb-0.5 px-1">{msg.author}</span>
+                      {msg.text.startsWith("[sticker]") ? (
+                        <video src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")} className="w-28 h-28 object-contain" autoPlay loop muted playsInline />
+                      ) : (
+                        <div className={`px-3 py-1.5 rounded-2xl max-w-[85%] text-sm ${msg.author === username ? "bg-blue-600 text-white rounded-br-md" : "bg-white/10 text-white rounded-bl-md"}`}>
+                          {msg.text}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Emoji bar */}
+                <div className="flex gap-0.5 px-2 py-1 justify-center flex-wrap border-t border-white/5">
+                  {EMOJI_REACTIONS.map((emoji) => (
+                    <button key={emoji} onClick={() => handleReaction(emoji)} className="text-base p-0.5 active:scale-125 transition-transform select-none">{emoji}</button>
+                  ))}
+                </div>
+
+                {/* Input */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const target = e.target as HTMLFormElement;
+                    const input = target.elements.namedItem("chatInputL") as HTMLInputElement;
+                    if (input.value.trim()) {
+                      emitChatMessage(username, input.value.trim());
+                      input.value = "";
+                    }
+                  }}
+                  className="flex gap-2 px-3 pb-3 pt-1"
+                >
+                  <input name="chatInputL" type="text" placeholder="Сообщение..." className="flex-1 bg-white/5 text-white rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600" />
+                  <button type="submit" className="bg-blue-600 text-white w-9 h-9 rounded-full flex items-center justify-center shrink-0 hover:bg-blue-500 transition-colors active:scale-90">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </form>
               </div>
             )}
 
-            {/* Minimal controls overlay */}
-            <div className="absolute bottom-2 right-2 flex items-center gap-1 z-20">
-              {adPlaying && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-semibold animate-pulse">📺</span>}
-              <span className="text-white/60 text-[10px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
-              <button onClick={() => setChatExpanded(true)} className="bg-white/10 backdrop-blur text-white/50 w-6 h-6 rounded-full flex items-center justify-center text-[10px] hover:text-white">
-                💬
-              </button>
-              <button onClick={toggleFullscreen} className="bg-white/10 backdrop-blur text-white/50 w-6 h-6 rounded-full flex items-center justify-center text-[10px] hover:text-white">
-                {isFullscreen ? "⊡" : "⊞"}
-              </button>
-            </div>
-
-            {/* Back button — top left */}
-            <button onClick={() => navigate("/")} className="absolute top-2 left-2 bg-black/40 backdrop-blur text-white/70 text-xs px-2 py-1 rounded-lg z-20">← Назад</button>
+            {/* Floating call widget — bottom left */}
+            {showCall && socket && (
+              <div className="absolute bottom-14 left-3 z-30 w-72 max-w-[60vw]">
+                <div className="bg-[#0f0f18]/90 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden shadow-2xl shadow-black/50">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
+                    <span className="text-white/60 text-[11px] font-medium">Видеозвонок</span>
+                    <button onClick={() => setShowCall(false)} className="text-white/30 hover:text-white transition-colors">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                  <div className="p-2">
+                    <VideoCall socket={socket} roomCode={code || ""} username={username} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          /* PORTRAIT MODE — existing mobile layout */
+          /* PORTRAIT MODE — clean minimal dark */
           <>
             {/* Video — full width, takes remaining space */}
-        <div className="relative flex-1 min-h-0">
-          <VideoPlayer
-            ref={videoPlayerRef}
-            videoUrl={videoUrl}
-            videoType={videoType}
-            onTimeUpdate={() => {}}
-            onStateChange={(state) => setPlayerState(state)}
-            onPlayerReady={() => setPlayerReady(true)}
-            onAdStateChange={(isAd) => {
-              if (manualAdRef.current) return;
-              setAdPlaying(isAd);
-              if (isAd) socket?.emit("ad-started", code);
-              else socket?.emit("ad-ended", code);
-            }}
-            onExternalStateChange={handleExternalStateChange}
-            onUserAction={handleUserAction}
-            syncAction={syncAction}
-          />
+            <div className="relative flex-1 min-h-0 bg-black">
+              <VideoPlayer
+                ref={videoPlayerRef}
+                videoUrl={videoUrl}
+                videoType={videoType}
+                onTimeUpdate={() => {}}
+                onStateChange={(state) => setPlayerState(state)}
+                onPlayerReady={() => setPlayerReady(true)}
+                onAdStateChange={(isAd) => {
+                  if (manualAdRef.current) return;
+                  setAdPlaying(isAd);
+                  if (isAd) socket?.emit("ad-started", code);
+                  else socket?.emit("ad-ended", code);
+                }}
+                onExternalStateChange={handleExternalStateChange}
+                onUserAction={handleUserAction}
+                syncAction={syncAction}
+              />
           {reactions.map((r) => (
             <div
               key={r.id}
@@ -874,29 +1000,39 @@ export function Room() {
 
           {/* Floating controls — bottom of video */}
           {videoUrl && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6 z-10">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8 z-10">
               {adPlaying && (
-                <div className="bg-red-600 text-white text-xs px-3 py-1 rounded-full font-semibold animate-pulse mb-1.5 inline-block">📺 Реклама</div>
+                <div className="bg-red-500/90 text-white text-[10px] px-2.5 py-0.5 rounded-full font-medium animate-pulse mb-2 inline-block">Реклама</div>
               )}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5">
                 {!playerReady ? (
                   <span className="text-yellow-400 text-[10px]">⏳</span>
                 ) : !canControl ? (
                   <span className="text-orange-400 text-[10px]">🔒</span>
                 ) : null}
-                <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
-                  {playerState === "playing" ? "⏸" : "▶"}
+                <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
+                  {playerState === "playing" ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  )}
                 </button>
-                <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏪</button>
-                <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/20 backdrop-blur disabled:opacity-30 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">⏩</button>
-                <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/10 backdrop-blur disabled:opacity-30 text-white/60 w-8 h-8 rounded-full flex items-center justify-center text-sm hover:text-white">🔄</button>
-                <span className="text-white/70 text-[11px] font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
-                <label className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer">
-                  📁
+                <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                </button>
+                <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                </button>
+                <button onClick={handleSync} disabled={!playerReady || adPlaying} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 disabled:opacity-30 hover:text-white transition-all">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                </button>
+                <span className="text-white/50 text-[11px] font-mono ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
+                <label className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 cursor-pointer hover:text-white transition-all">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   <input type="file" accept=".mp4,.webm,.mkv,.avi,.mov,.ogg,.ogv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f); }} />
                 </label>
-                <button onClick={() => setShowCall(!showCall)} className="bg-white/20 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">
-                  {showCall ? "📞" : "📹"}
+                <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                 </button>
                 <button
                   onClick={() => {
@@ -911,9 +1047,9 @@ export function Room() {
                     if (newAd) socket?.emit("ad-started", code);
                     else socket?.emit("ad-ended", code);
                   }}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${adPlaying ? "bg-red-600 text-white" : "bg-white/20 backdrop-blur text-white"}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60 hover:text-white"}`}
                 >
-                  📺
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
                 </button>
               </div>
               {uploading && (
@@ -1165,6 +1301,10 @@ export function Room() {
           15% { opacity: 1; transform: translateY(0); }
           85% { opacity: 1; }
           100% { opacity: 0; }
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
         }
       `}</style>
     </div>

@@ -6,12 +6,13 @@ export function CreateRoom() {
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
+  const apiUrl = window.location.port === "5173"
+    ? `http://${window.location.hostname}:3001`
+    : "";
+
   const handleCreate = async () => {
     setIsCreating(true);
     try {
-      const apiUrl = window.location.port === "5173"
-        ? `http://${window.location.hostname}:3001`
-        : "";
       const response = await fetch(`${apiUrl}/api/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,81 +34,107 @@ export function CreateRoom() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Watch<span className="text-blue-400">Together</span>
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
+      {/* Subtle gradient background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-30%] left-[-20%] w-[60%] h-[60%] bg-blue-600/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-600/5 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="w-full max-w-sm relative z-10">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20 mb-4">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Watch Together
           </h1>
-          <p className="text-gray-400">
-            Смотрите видео вместе с друзьями
+          <p className="text-sm text-gray-500 mt-1">
+            Смотрите видео вместе в реальном времени
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+        <div className="bg-[#12121a] rounded-2xl p-5 border border-white/5 shadow-2xl shadow-black/50">
           {/* Create button */}
           <button
             onClick={handleCreate}
             disabled={isCreating}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3.5 rounded-xl font-semibold text-sm hover:from-blue-500 hover:to-blue-400 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 active:scale-[0.98]"
           >
-            {isCreating ? "Создание..." : "+ Создать комнату"}
+            {isCreating ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                Создание...
+              </span>
+            ) : "Создать комнату"}
           </button>
 
           {/* Divider */}
-          <div className="flex items-center my-6">
-            <div className="flex-1 border-t border-gray-700"></div>
-            <span className="px-3 text-gray-500 text-sm">или</span>
-            <div className="flex-1 border-t border-gray-700"></div>
+          <div className="flex items-center my-5">
+            <div className="flex-1 h-px bg-white/5" />
+            <span className="px-3 text-gray-600 text-xs">или войти по коду</span>
+            <div className="flex-1 h-px bg-white/5" />
           </div>
 
-          {/* Join */}
+          {/* Join by code */}
           <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Войти по коду комнаты
-            </label>
             <input
               type="text"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="Код из 6 букв"
+              placeholder="Код комнаты"
               maxLength={6}
-              className="w-full bg-gray-800 text-white text-center text-xl font-mono tracking-widest rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-600"
-              onKeyPress={(e) => {
+              className="w-full bg-white/5 text-white text-center text-lg font-mono tracking-[0.3em] rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:bg-white/[0.07] placeholder:text-gray-600 placeholder:tracking-normal placeholder:font-sans transition-all"
+              onKeyDown={(e) => {
                 if (e.key === "Enter") handleJoin();
               }}
             />
             <button
               onClick={handleJoin}
               disabled={!joinCode.trim()}
-              className="w-full bg-gray-800 text-white py-3 rounded-xl font-semibold hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700"
+              className="w-full bg-white/5 text-gray-300 py-3 rounded-xl font-semibold text-sm hover:bg-white/10 transition-all disabled:opacity-20 disabled:cursor-not-allowed border border-white/5 active:scale-[0.98]"
             >
               Присоединиться
             </button>
           </div>
         </div>
 
-        {/* Platforms */}
-        <div className="mt-6 text-center text-gray-500 text-sm">
-          YouTube • RuTube • Загрузка файлов
+        {/* Footer */}
+        <div className="mt-6 flex items-center justify-center gap-3 text-gray-600 text-[11px]">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500/60" />
+            YouTube
+          </span>
+          <span className="text-gray-700">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500/60" />
+            RuTube
+          </span>
+          <span className="text-gray-700">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500/60" />
+            Файлы
+          </span>
         </div>
 
-        {/* Force update button — temporary for testing */}
-        <div className="mt-4 text-center">
+        {/* Force update — hidden link */}
+        <div className="mt-8 text-center">
           <button
             onClick={async () => {
               if ("serviceWorker" in navigator) {
                 const regs = await navigator.serviceWorker.getRegistrations();
                 for (const r of regs) await r.unregister();
               }
-              caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+              caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
               window.location.reload();
             }}
-            className="text-gray-600 text-[10px] hover:text-gray-400 transition-colors underline"
+            className="text-gray-700 text-[10px] hover:text-gray-500 transition-colors"
           >
-            ⚡ Принудительно обновить SW
+            обновить
           </button>
         </div>
       </div>
