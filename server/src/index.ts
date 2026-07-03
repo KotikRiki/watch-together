@@ -34,6 +34,23 @@ app.use("/api/admin", adminRouter);
 app.use("/api/stickers", stickersRouter);
 setupUploadServing(app);
 
+app.get("/reset-pwa", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Сброс PWA</title></head>' +
+    '<body style="background:#0a0a0f;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">' +
+    '<div style="text-align:center"><h2>Очистка кеша...</h2>' +
+    '<script>' +
+    '(async function(){' +
+    'try{var r=await navigator.serviceWorker.getRegistrations();for(var i=0;i<r.length;i++)await r[i].unregister();}catch(e){}' +
+    'try{var k=await caches.keys();for(var j=0;j<k.length;j++)await caches.delete(k[j]);}catch(e){}' +
+    'setTimeout(function(){window.location.href="/";},500);' +
+    '})();' +
+    '</script></div></body></html>'
+  );
+});
+
 const possiblePaths = [
   path.join(process.cwd(), "../client/dist"),
   path.join(process.cwd(), "client/dist"),
