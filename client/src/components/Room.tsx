@@ -59,6 +59,7 @@ export function Room() {
   const roomContainerRef = useRef<HTMLDivElement>(null);
   const desktopContainerRef = useRef<HTMLDivElement>(null);
   const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
+  const [landscapeEmojiOpen, setLandscapeEmojiOpen] = useState(false);
   const [landscapeBarsVisible, setLandscapeBarsVisible] = useState(true);
   const landscapeBarsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUserActionRef = useRef(false);
@@ -568,7 +569,7 @@ export function Room() {
         </div>
 
         {/* Header */}
-        <header className="h-[52px] border-b border-white/5 flex items-center px-4 shrink-0 bg-[#0a0a0f]/90 backdrop-blur-xl relative z-10">
+        <header className={`${isMobile && isLandscape ? "hidden" : ""} h-[52px] border-b border-white/5 flex items-center px-4 shrink-0 bg-[#0a0a0f]/90 backdrop-blur-xl relative z-10`}>
           <div className="flex items-center gap-3">
             <button onClick={() => navigate("/")} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -972,11 +973,18 @@ export function Room() {
               </div>
             )}
 
-            {/* Emoji bar — bottom right in landscape */}
-            <div className="pointer-events-auto absolute bottom-14 right-3 z-30 flex gap-1 bg-[#0f0f18]/80 backdrop-blur-lg rounded-full px-2 py-1.5 border border-white/5">
-              {EMOJI_REACTIONS.map((emoji) => (
-                <button key={emoji} onClick={() => handleReaction(emoji)} className="text-base p-0.5 active:scale-125 transition-transform select-none">{emoji}</button>
-              ))}
+            {/* Emoji bar — collapsible, right side in landscape */}
+            <div className="pointer-events-auto absolute bottom-16 right-3 z-30 flex flex-col items-end gap-1">
+              {landscapeEmojiOpen && (
+                <div className="flex flex-col gap-1 bg-[#0f0f18]/90 backdrop-blur-lg rounded-2xl px-1.5 py-2 border border-white/5 animate-[slideUp_0.15s_ease-out]">
+                  {EMOJI_REACTIONS.map((emoji) => (
+                    <button key={emoji} onClick={() => { handleReaction(emoji); setLandscapeEmojiOpen(false); }} className="text-lg p-0.5 active:scale-125 transition-transform select-none">{emoji}</button>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setLandscapeEmojiOpen(!landscapeEmojiOpen)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${landscapeEmojiOpen ? "bg-blue-500/20 text-blue-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                <span className="text-lg">😊</span>
+              </button>
             </div>
           </div>
         )}

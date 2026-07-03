@@ -374,10 +374,19 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           ref={iframeRef}
           key={videoInfo.id}
           src={`https://rutube.ru/play/embed/${videoInfo.id}?no_brand=1&autoplay=0`}
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full pointer-events-none"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         />
+        <button
+          onClick={() => onUserAction?.("play", currentTimeRef.current)}
+          className="absolute inset-0 z-10 flex items-center justify-center"
+          aria-label="Play/Pause"
+        >
+          <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center transition-opacity hover:bg-black/50">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </button>
       </div>
     );
   }
