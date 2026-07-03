@@ -208,7 +208,7 @@ export function setupSocketHandlers(io: Server) {
       socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
     });
 
-    socket.on("chat-message", async (roomCode: string, message: { author: string; text: string }) => {
+    socket.on("chat-message", async (roomCode: string, message: { author: string; text: string; replyToId?: string }) => {
       let roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
       let roomId: string;
 
@@ -224,8 +224,8 @@ export function setupSocketHandlers(io: Server) {
 
       const msgId = generateId();
       await query(
-        "INSERT INTO messages (id, room_id, author, text) VALUES ($1, $2, $3, $4)",
-        [msgId, roomId, message.author, message.text]
+        "INSERT INTO messages (id, room_id, author, text, reply_to_id) VALUES ($1, $2, $3, $4, $5)",
+        [msgId, roomId, message.author, message.text, message.replyToId || null]
       );
 
       await query(
@@ -238,6 +238,7 @@ export function setupSocketHandlers(io: Server) {
         roomId,
         author: message.author,
         text: message.text,
+        replyToId: message.replyToId || null,
         createdAt: new Date().toISOString(),
       });
     });

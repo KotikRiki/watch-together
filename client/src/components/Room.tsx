@@ -11,6 +11,7 @@ interface Message {
   id: string;
   author: string;
   text: string;
+  replyToId?: string | null;
   createdAt: string;
 }
 
@@ -41,10 +42,25 @@ export function Room() {
   const [showCall, setShowCall] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const [showStickersMobile, setShowStickersMobile] = useState(false);
+  const [replyToMobile, setReplyToMobile] = useState<Message | null>(null);
   const [adPlaying, setAdPlaying] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (chatExpanded) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatExpandedRef.current = chatExpanded;
+  }, [chatExpanded]);
+
+  useEffect(() => {
+    document.title = "Watch Together";
+    return () => { document.title = "Watch Together"; };
+  }, []);
+
+  useEffect(() => {
+    if (chatExpanded) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      setUnreadCount(0);
+      if (document.title.startsWith("(")) document.title = document.title.replace(/^\(\d+\)\s*/, "");
+    }
   }, [messages, chatExpanded]);
   const [playerState, setPlayerState] = useState<"playing" | "paused" | "ended">("paused");
   const playerStateRef = useRef<"playing" | "paused" | "ended">("paused");
@@ -55,6 +71,7 @@ export function Room() {
   const [watchTimes, setWatchTimes] = useState<{ username: string; seconds: number }[]>([]);
   const videoPlayerRef = useRef<VideoPlayerHandle>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatExpandedRef = useRef(false);
   const lastSyncEventRef = useRef(0);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncFromActionRef = useRef(false);
@@ -147,6 +164,13 @@ export function Room() {
 
     on("new-message", (message: Message) => {
       setMessages((prev) => [...prev, message]);
+      if (!chatExpandedRef.current) {
+        setUnreadCount((c) => {
+          const next = c + 1;
+          document.title = next > 0 ? `(${next}) Watch Together` : "Watch Together";
+          return next;
+        });
+      }
     });
 
     on("queue-updated", (data: { action: string; item?: QueueItem; removedItem?: QueueItem }) => {
@@ -619,7 +643,7 @@ export function Room() {
 
           {/* Chat — fills remaining space */}
           <div className="flex-1 min-h-0">
-            <Chat messages={messages} onSendMessage={(text) => emitChatMessage(username, text)} onReaction={handleReaction} username={username} />
+            <Chat messages={messages} onSendMessage={(text, replyToId) => emitChatMessage(username, text, replyToId)} onReaction={handleReaction} username={username} />
           </div>
 
           <button onClick={() => setShowCall(!showCall)} className="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition-colors border border-gray-700">
@@ -789,29 +813,54 @@ export function Room() {
                 {messages.length === 0 && (
                   <p className="text-gray-600 text-xs text-center mt-8">Пока нет сообщений</p>
                 )}
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"} mb-1.5`}>
-                    <span className="text-[10px] text-gray-500 mb-0.5">{msg.author}</span>
-                    {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
-                      <video
-                        src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
-                        className="w-32 h-32 object-contain"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <div className={`px-3 py-1.5 rounded-2xl max-w-[80%] text-sm ${
-                        msg.author === username
-                          ? "bg-blue-600 text-white rounded-br-sm"
-                          : "bg-gray-700 text-white rounded-bl-sm"
-                      }`}>
-                        {msg.text}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {messages.map((msg) => {
+                  const replyMsg = msg.replyToId ? messages.find((m) => m.id === msg.replyToId) : null;
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"} mb-1.5`}>
+                      <span className="text-[10px] text-gray-500 mb-0.5">{msg.author}</span>
+                      {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
+                        <div className="relative">
+                          {replyMsg && (
+                            <div className="text-[9px] mb-0.5 px-2 py-0.5 rounded bg-gray-700/50 border-l-2 border-gray-500">
+                              <span className="font-semibold">{replyMsg.author}</span>
+                              <span className="opacity-70 ml-1">{replyMsg.text.replace(/\[sticker\].*?\[\/sticker\]/, "🖼 стикер").substring(0, 30)}</span>
+                            </div>
+                          )}
+                          <video
+                            src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
+                            className="w-32 h-32 object-contain"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                          />
+                        </div>
+                      ) : (
+                        <div className="relative group">
+                          {replyMsg && (
+                            <div className="text-[9px] mb-0.5 px-2 py-0.5 rounded bg-gray-700/50 border-l-2 border-gray-500">
+                              <span className="font-semibold">{replyMsg.author}</span>
+                              <span className="opacity-70 ml-1">{replyMsg.text.replace(/\[sticker\].*?\[\/sticker\]/, "🖼 стикер").substring(0, 30)}</span>
+                            </div>
+                          )}
+                          <div
+                            className={`px-3 py-1.5 rounded-2xl max-w-[80%] text-sm ${
+                              msg.author === username
+                                ? "bg-blue-600 text-white rounded-br-sm"
+                                : "bg-gray-700 text-white rounded-bl-sm"
+                            }`}
+                            onClick={() => {
+                              if (replyToMobile?.id === msg.id) setReplyToMobile(null);
+                              else setReplyToMobile(msg);
+                            }}
+                          >
+                            {msg.text}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -841,11 +890,21 @@ export function Room() {
               {showStickersMobile && (
                 <StickerPanel
                   onSendSticker={(url) => {
-                    emitChatMessage(username, `[sticker]${url}[/sticker]`);
+                    emitChatMessage(username, `[sticker]${url}[/sticker]`, replyToMobile?.id);
                     setShowStickersMobile(false);
+                    setReplyToMobile(null);
                   }}
                   onClose={() => setShowStickersMobile(false)}
                 />
+              )}
+
+              {/* Reply indicator */}
+              {replyToMobile && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-gray-800 text-xs shrink-0">
+                  <span className="text-blue-400">↩ {replyToMobile.author}</span>
+                  <span className="text-gray-400 truncate flex-1">{replyToMobile.text.replace(/\[sticker\].*?\[\/sticker\]/, "🖼 стикер").substring(0, 40)}</span>
+                  <button onClick={() => setReplyToMobile(null)} className="text-gray-500 hover:text-white">✕</button>
+                </div>
               )}
 
               {/* Input */}
@@ -855,8 +914,9 @@ export function Room() {
                   const target = e.target as HTMLFormElement;
                   const input = target.elements.namedItem("chatInput") as HTMLInputElement;
                   if (input.value.trim()) {
-                    emitChatMessage(username, input.value.trim());
+                    emitChatMessage(username, input.value.trim(), replyToMobile?.id);
                     input.value = "";
+                    setReplyToMobile(null);
                   }
                 }}
                 className="flex gap-1 px-3 pb-3 pt-1 shrink-0"
@@ -887,7 +947,12 @@ export function Room() {
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-white/60 text-xs">💬 Чат</span>
-                {messages.length > 0 && (
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+                {unreadCount === 0 && messages.length > 0 && (
                   <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                     {messages.length}
                   </span>

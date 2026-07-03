@@ -5,12 +5,13 @@ interface Message {
   id: string;
   author: string;
   text: string;
+  replyToId?: string | null;
   createdAt: string;
 }
 
 interface ChatProps {
   messages: Message[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, replyToId?: string) => void;
   onReaction: (emoji: string) => void;
   username: string;
 }
@@ -20,6 +21,7 @@ const EMOJI_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉
 export function Chat({ messages, onSendMessage, onReaction, username }: ChatProps) {
   const [input, setInput] = useState("");
   const [showStickers, setShowStickers] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,8 +32,9 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
     e.preventDefault();
     e.stopPropagation();
     if (input.trim()) {
-      onSendMessage(input.trim());
+      onSendMessage(input.trim(), replyTo?.id);
       setInput("");
+      setReplyTo(null);
     }
   };
 
@@ -56,36 +59,57 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
         {messages.length === 0 && (
           <p className="text-gray-600 text-xs text-center mt-4">Пока нет сообщений</p>
         )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex flex-col ${
-              msg.author === username ? "items-end" : "items-start"
-            }`}
-          >
-            <span className="text-xs text-gray-500 mb-0.5">{msg.author}</span>
-            {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
-              <video
-                src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
-                className="w-32 h-32 object-contain"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            ) : (
-              <div
-                className={`px-3 py-1.5 rounded-lg max-w-[80%] text-sm ${
-                  msg.author === username
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 text-white"
-                }`}
-              >
-                {msg.text}
-              </div>
-            )}
-          </div>
-        ))}
+        {messages.map((msg) => {
+          const replyMsg = msg.replyToId ? messages.find((m) => m.id === msg.replyToId) : null;
+          return (
+            <div
+              key={msg.id}
+              className={`flex flex-col ${
+                msg.author === username ? "items-end" : "items-start"
+              }`}
+            >
+              <span className="text-xs text-gray-500 mb-0.5">{msg.author}</span>
+              {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
+                <video
+                  src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}
+                  className="w-32 h-32 object-contain"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              ) : (
+                <div
+                  className={`group relative px-3 py-1.5 rounded-lg max-w-[80%] text-sm ${
+                    msg.author === username
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-700 text-white"
+                  }`}
+                >
+                  {replyMsg && (
+                    <div className={`text-[10px] mb-1 px-2 py-0.5 rounded border-l-2 ${
+                      msg.author === username
+                        ? "border-blue-300 bg-blue-700/50"
+                        : "border-gray-500 bg-gray-600/50"
+                    }`}>
+                      <span className="font-semibold">{replyMsg.author}</span>
+                      <span className="opacity-70 ml-1">{replyMsg.text.replace(/\[sticker\].*?\[\/sticker\]/, "🖼 стикер").substring(0, 40)}</span>
+                    </div>
+                  )}
+                  {msg.text}
+                  <button
+                    onClick={() => setReplyTo(replyTo?.id === msg.id ? null : msg)}
+                    className={`absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gray-800 text-gray-400 hover:text-white text-[10px] items-center justify-center hidden group-hover:flex transition-colors ${
+                      replyTo?.id === msg.id ? "!flex bg-blue-600 text-white" : ""
+                    }`}
+                  >
+                    ↩
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -97,6 +121,13 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
       )}
 
       <div className="p-2 border-t border-gray-700">
+        {replyTo && (
+          <div className="flex items-center gap-2 mb-2 px-2 py-1 bg-gray-800 rounded-lg text-xs">
+            <span className="text-blue-400">↩ {replyTo.author}</span>
+            <span className="text-gray-400 truncate flex-1">{replyTo.text.replace(/\[sticker\].*?\[\/sticker\]/, "🖼 стикер").substring(0, 50)}</span>
+            <button onClick={() => setReplyTo(null)} className="text-gray-500 hover:text-white">✕</button>
+          </div>
+        )}
         <div className="flex gap-0.5 mb-2 justify-center flex-wrap">
           {EMOJI_REACTIONS.map((emoji) => (
             <button
@@ -125,7 +156,7 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Сообщение..."
+            placeholder={replyTo ? `Ответ ${replyTo.author}...` : "Сообщение..."}
             className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
           />
           <button

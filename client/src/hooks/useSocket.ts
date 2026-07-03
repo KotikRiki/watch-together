@@ -57,9 +57,9 @@ export function useSocket(roomCode: string | null) {
     }
   };
 
-  const emitChatMessage = (author: string, text: string) => {
+  const emitChatMessage = (author: string, text: string, replyToId?: string) => {
     if (socketRef.current && roomCode) {
-      socketRef.current.emit("chat-message", roomCode, { author, text });
+      socketRef.current.emit("chat-message", roomCode, { author, text, replyToId });
     }
   };
 

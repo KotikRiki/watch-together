@@ -431,6 +431,10 @@ export async function initDB() {
         CREATE INDEX IF NOT EXISTS idx_watch_sessions_username ON watch_sessions(username);
         CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
       `);
+      // Migration: add reply_to_id if missing
+      try {
+        await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id VARCHAR(20)`);
+      } catch {}
       usePostgres = true;
       console.log("Database initialized (PostgreSQL)");
     } finally {
