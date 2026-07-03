@@ -920,16 +920,9 @@ export function Room() {
 
               {/* Chat button — always visible, top right */}
               <div className="absolute top-3 right-3 pointer-events-auto">
-                <button onClick={(e) => { e.stopPropagation(); setChatExpanded(!chatExpanded); }} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
+                <button onClick={(e) => { e.stopPropagation(); isLandscape ? setLandscapeChatOpen(!landscapeChatOpen) : setChatExpanded(!chatExpanded); }} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  {unreadCount > 0 && !chatExpanded && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
-                </button>
-              </div>
-
-              {/* Bottom play/pause — always visible */}
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-auto">
-                <button onClick={(e) => { e.stopPropagation(); handlePlayPause(); }} disabled={!canControl} className="w-14 h-14 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white disabled:opacity-30 hover:bg-black/50 transition-all">
-                  {playerState === "playing" ? <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> : <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>}
+                  {unreadCount > 0 && !chatExpanded && !landscapeChatOpen && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
                 </button>
               </div>
             </div>
@@ -985,8 +978,8 @@ export function Room() {
               </div>
             )}
 
-            {/* File videos: chat button top right only */}
-            {videoType === "file" && (
+            {/* File videos: chat button top right only (in portrait, landscape uses its own) */}
+            {videoType === "file" && !isLandscape && (
               <div className="pointer-events-auto absolute top-3 right-3">
                 <button onClick={() => setChatExpanded(!chatExpanded)} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -996,7 +989,7 @@ export function Room() {
             )}
 
             {/* Bottom bar */}
-            <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+            <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${videoType === "file" || landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   {videoUrl && (
