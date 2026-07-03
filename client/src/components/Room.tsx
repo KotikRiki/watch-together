@@ -171,6 +171,11 @@ export function Room() {
       setAdPlaying(data.isAd);
     });
 
+    on("room-closed", () => {
+      alert("Комната закрыта администратором");
+      navigate("/");
+    });
+
     return () => {
       off("room-state");
       off("video-sync");
@@ -184,6 +189,7 @@ export function Room() {
       off("reaction");
       off("watch-time-update");
       off("ad-state-changed");
+      off("room-closed");
       if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
     };
   }, [socket]);

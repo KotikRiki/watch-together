@@ -159,11 +159,20 @@ export function Admin() {
   };
 
   const deleteRoom = async (code: string) => {
-    if (!confirm(`Удалить комнату ${code}?`)) return;
+    if (!confirm(`Удалить комнату ${code}? Все сообщения и файлы будут удалены.`)) return;
     try {
       await fetch(`/api/admin/rooms/${code}`, { ...headers, method: "DELETE" });
       showToast(`Комната ${code} удалена`);
       fetchRooms();
+    } catch {}
+  };
+
+  const closeRoom = async (code: string) => {
+    if (!confirm(`Закрыть комнату ${code}? Все пользователи будут отключены.`)) return;
+    try {
+      const r = await fetch(`/api/admin/rooms/${code}/close`, { ...headers, method: "POST" });
+      if (r.ok) showToast(`Комната ${code} закрыта`);
+      else showToast("Ошибка");
     } catch {}
   };
 
@@ -188,6 +197,13 @@ export function Admin() {
     if (tab === "watchTime") fetchWatchTime();
     if (tab === "system") fetchSystem();
   }, [auth, tab]);
+
+  useEffect(() => {
+    if (!auth || tab !== "rooms") return;
+    fetchRooms();
+    const iv = setInterval(fetchRooms, 10000);
+    return () => clearInterval(iv);
+  }, [auth, tab, fetchRooms]);
 
   useEffect(() => {
     if (!auth || tab !== "rooms") return;
@@ -342,6 +358,8 @@ export function Admin() {
                       <span className="text-gray-600 text-xs">{new Date(r.createdAt).toLocaleDateString()}</span>
                       <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.code); showToast("Скопировано"); }}
                         className="text-gray-500 hover:text-white text-xs px-1">📋</button>
+                      <button onClick={(e) => { e.stopPropagation(); closeRoom(r.code); }}
+                        className="text-yellow-500 hover:text-yellow-400 text-xs px-1" title="Закрыть комнату">⚡</button>
                       <button onClick={(e) => { e.stopPropagation(); deleteRoom(r.code); }}
                         className="text-red-500 hover:text-red-400 text-xs px-1">🗑</button>
                     </div>

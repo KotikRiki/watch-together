@@ -1,7 +1,7 @@
 import { Router } from "express";
 import os from "os";
 import { query } from "../db/postgres";
-import { getActiveRooms, getActiveUserCount } from "../socket/handlers";
+import { getActiveRooms, getActiveUserCount, broadcastToRoom } from "../socket/handlers";
 
 export const adminRouter = Router();
 
@@ -369,10 +369,28 @@ adminRouter.delete("/rooms/:code", async (req, res) => {
   try {
     const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [req.params.code]);
     if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
-    await query("DELETE FROM rooms WHERE code = $1", [req.params.code]);
+    const roomId = roomResult.rows[0].id;
+    await query("DELETE FROM messages WHERE room_id = $1", [roomId]);
+    await query("DELETE FROM queue WHERE room_id = $1", [roomId]);
+    await query("DELETE FROM uploads WHERE room_id = $1", [roomId]);
+    await query("DELETE FROM video_history WHERE room_id = $1", [roomId]);
+    await query("DELETE FROM watch_sessions WHERE room_id = $1", [roomId]);
+    await query("DELETE FROM rooms WHERE id = $1", [roomId]);
     res.json({ success: true });
   } catch (error) {
     console.error("Delete room error:", error);
     res.status(500).json({ error: "Failed to delete room" });
+  }
+});
+
+adminRouter.post("/rooms/:code/close", async (req, res) => {
+  try {
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [req.params.code]);
+    if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+    broadcastToRoom(req.params.code, "room-closed", {});
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Close room error:", error);
+    res.status(500).json({ error: "Failed to close room" });
   }
 });

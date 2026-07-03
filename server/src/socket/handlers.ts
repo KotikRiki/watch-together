@@ -16,6 +16,11 @@ interface RoomState {
 }
 
 const rooms = new Map<string, RoomState>();
+let ioRef: Server | null = null;
+
+export function broadcastToRoom(roomCode: string, event: string, data: any) {
+  ioRef?.to(roomCode).emit(event, data);
+}
 
 async function flushWatchTime(roomCode: string) {
   const roomState = rooms.get(roomCode);
@@ -37,6 +42,7 @@ async function flushWatchTime(roomCode: string) {
 }
 
 export function setupSocketHandlers(io: Server) {
+  ioRef = io;
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
