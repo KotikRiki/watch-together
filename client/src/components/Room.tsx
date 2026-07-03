@@ -95,20 +95,10 @@ export function Room() {
     };
   }, []);
 
-  // Fullscreen tracking — block iframe hijacking
+  // Fullscreen tracking
   useEffect(() => {
     const onFsChange = () => {
-      const el = document.fullscreenElement;
-      setIsFullscreen(!!el);
-      // If an iframe captured fullscreen (YouTube/RuTube), force exit it
-      if (el && el.tagName === "IFRAME") {
-        document.exitFullscreen().catch(() => {});
-        // After exit, apply our container fullscreen
-        setTimeout(() => {
-          const container = isMobile ? roomContainerRef.current : desktopContainerRef.current;
-          container?.requestFullscreen().catch(() => {});
-        }, 100);
-      }
+      setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
