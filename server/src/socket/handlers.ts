@@ -263,6 +263,47 @@ export function setupSocketHandlers(io: Server) {
       socket.to(roomCode).emit("call-ended");
     });
 
+    socket.on("play-next", async (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+
+      const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+      if (roomResult.rows.length === 0) return;
+      const roomId = roomResult.rows[0].id;
+
+      const nextResult = await query(
+        "SELECT id, url, title FROM queue WHERE room_id = $1 ORDER BY sort_order ASC LIMIT 1",
+        [roomId]
+      );
+
+      if (nextResult.rows.length === 0) {
+        io.to(roomCode).emit("video-changed", { videoUrl: null, videoType: "embed" });
+        roomState.videoUrl = null;
+        return;
+      }
+
+      const next = nextResult.rows[0];
+      await query("DELETE FROM queue WHERE id = $1", [next.id]);
+      await query(
+        "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE id = $2",
+        [next.url, roomId]
+      );
+
+      if (roomState.videoUrl) {
+        await query(
+          "INSERT INTO video_history (room_id, url, changed_by) VALUES ($1, $2, $3)",
+          [roomId, roomState.videoUrl, "auto"]
+        );
+      }
+
+      roomState.videoUrl = next.url;
+      roomState.currentTime = 0;
+      roomState.isPlaying = true;
+
+      io.to(roomCode).emit("video-changed", { videoUrl: next.url, videoType: "embed" });
+      io.to(roomCode).emit("queue-updated", { action: "next", removedItem: { id: next.id, url: next.url, title: next.title } });
+    });
+
     socket.on("disconnect", async () => {
       console.log("User disconnected:", socket.id);
       for (const [roomCode, roomState] of rooms) {

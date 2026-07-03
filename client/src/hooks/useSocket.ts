@@ -77,7 +77,13 @@ export function useSocket(roomCode: string | null) {
 
   const emitQueueNext = () => {
     if (socketRef.current && roomCode) {
-      socketRef.current.emit("queue-next", roomCode);
+      socketRef.current.emit("remove-from-queue", roomCode);
+    }
+  };
+
+  const emitPlayNext = () => {
+    if (socketRef.current && roomCode) {
+      socketRef.current.emit("play-next", roomCode);
     }
   };
 
@@ -105,6 +111,7 @@ export function useSocket(roomCode: string | null) {
     emitEmojiReaction,
     emitQueueAdd,
     emitQueueNext,
+    emitPlayNext,
     on,
     off,
   };

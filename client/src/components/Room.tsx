@@ -95,6 +95,7 @@ export function Room() {
     emitEmojiReaction,
     emitQueueAdd,
     emitQueueNext,
+    emitPlayNext,
     on,
     off,
   } = useSocket(code || null);
@@ -217,6 +218,16 @@ export function Room() {
       if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
     };
   }, [socket]);
+
+  // Auto-play next from queue when video ends (host only)
+  useEffect(() => {
+    if (playerState === "ended" && isHost && queue.length > 0) {
+      const timer = setTimeout(() => {
+        emitPlayNext();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [playerState, isHost, queue.length]);
 
   // Heartbeat: send current time every 3 seconds + request watch time every 10s
   useEffect(() => {
