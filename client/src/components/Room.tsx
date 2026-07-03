@@ -766,7 +766,7 @@ export function Room() {
       </div>
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className="lg:hidden fixed inset-0 bg-black flex flex-col" style={{ top: isLandscape || isFullscreen ? "0" : "52px" }}>
+      <div ref={roomContainerRef} className={`lg:hidden fixed inset-0 bg-black flex flex-col transition-all duration-300 ${(isLandscape || isFullscreen) ? "top-0" : "top-[52px]"}`}>
         {isLandscape || isFullscreen ? (
           /* LANDSCAPE MODE — minimal UI, video fills screen */
           <div className="relative w-full h-full">
