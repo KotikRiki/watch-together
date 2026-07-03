@@ -42,7 +42,13 @@ const possiblePaths = [
 ];
 const clientPath = possiblePaths.find(p => fs.existsSync(path.join(p, "index.html"))) || possiblePaths[0];
 
-app.use(express.static(clientPath));
+app.use(express.static(clientPath, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith("index.html") || filePath.endsWith("sw.js") || filePath.endsWith("registerSW.js")) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    }
+  }
+}));
 
 const indexPath = path.join(clientPath, "index.html");
 
