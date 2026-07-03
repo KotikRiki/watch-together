@@ -362,7 +362,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             ref={iframeRef}
             key={videoInfo.id}
             src={`https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=0&modestbranding=1&rel=0&fs=0&playsinline=1&iv_load_policy=3&showinfo=0`}
-            className="absolute inset-0 w-full h-full"
+            className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           />
         </div>
@@ -375,7 +375,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           ref={iframeRef}
           key={videoInfo.id}
           src={`https://rutube.ru/play/embed/${videoInfo.id}`}
-          className="absolute inset-0 w-full h-full"
+          className="w-full h-full"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           allowFullScreen
