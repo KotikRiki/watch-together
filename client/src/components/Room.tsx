@@ -556,10 +556,10 @@ export function Room() {
         </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
-      <div ref={roomContainerRef} className={`${isMobile ? "hidden" : "flex"} h-[calc(100vh-72px)] gap-0`}>
+      <div ref={roomContainerRef} className={`${isMobile ? "hidden" : "flex"} flex-1 gap-0 min-h-0`}>
         {/* Video column — takes all available space */}
-        <div className="flex-1 flex flex-col min-w-0 p-4 pr-2 gap-3">
-          {/* Video player with sticker overlay */}
+        <div className="flex-1 flex flex-col min-w-0 p-3 pr-1.5 gap-2">
+          {/* Video player */}
           <div className="relative flex-1 min-h-0 bg-black rounded-xl overflow-hidden">
             <VideoPlayer
               ref={videoPlayerRef}
@@ -588,56 +588,42 @@ export function Room() {
                 {r.emoji}
               </div>
             ))}
-            {/* Sticker chat messages — right edge overlay */}
-            <div className="absolute right-3 top-3 bottom-3 w-72 flex flex-col justify-end gap-1.5 pointer-events-none z-10">
-              {messages.slice(-5).map((msg, i) => (
-                <div
-                  key={msg.id || i}
-                  className="bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-sm animate-[floatMsg_8s_ease-out_forwards]"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                >
-                  <span className="text-blue-400 font-semibold">{msg.author}: </span>
-                  <span className="text-white">{msg.text}</span>
-                </div>
-              ))}
-            </div>
             {/* Floating badges — top */}
             <div className="absolute top-2 left-2 right-2 flex items-start justify-between pointer-events-none">
               <div className="flex flex-col gap-1">
-                {isHost && <span className="bg-yellow-500/80 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">👑 Хост</span>}
-                {hostOnly && <span className="bg-orange-500/80 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">🔒</span>}
+                {isHost && <span className="bg-yellow-500/15 text-yellow-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-yellow-500/10">Хост</span>}
+                {hostOnly && <span className="bg-orange-500/15 text-orange-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-orange-500/10">Ограничен</span>}
               </div>
-              <button onClick={toggleFullscreen} className="pointer-events-auto bg-black/40 backdrop-blur text-white/70 text-xs px-2 py-1 rounded-lg hover:text-white transition-colors">
-                {isFullscreen ? "⊡ Выйти" : "⊞ Полный"}
+              <button onClick={toggleFullscreen} className="pointer-events-auto bg-white/10 backdrop-blur text-white/60 text-[11px] px-2.5 py-1 rounded-lg hover:text-white transition-colors">
+                {isFullscreen ? "Выйти" : "Полный"}
               </button>
               {watchTimes.length > 0 && (
-                <div className="bg-black/60 backdrop-blur rounded-full px-2 py-0.5 flex items-center gap-1">
-                  <span className="text-[10px]">⏱</span>
+                <div className="bg-black/40 backdrop-blur rounded-full px-2 py-0.5 flex items-center gap-1">
                   {watchTimes.map((wt, i) => (
-                    <span key={i} className="text-[10px] text-green-400 font-mono">{formatTime(wt.seconds)}</span>
+                    <span key={i} className="text-[10px] text-green-400/80 font-mono">{formatTime(wt.seconds)}</span>
                   ))}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Controls bar — compact, under video */}
+          {/* Controls bar */}
           {videoUrl && (
-            <div className="bg-gray-800/50 rounded-lg px-4 py-2 flex items-center gap-2 flex-wrap">
+            <div className="bg-[#12121a] rounded-xl px-3 py-2 flex items-center gap-1.5 border border-white/5">
               {!playerReady ? (
-                <span className="text-yellow-400 text-xs">⏳ Загрузка плеера...</span>
+                <span className="text-yellow-400/80 text-[11px]">Загрузка...</span>
               ) : !canControl ? (
-                <span className="text-orange-400 text-xs">🔒 Только хост управляет видео</span>
+                <span className="text-orange-400/80 text-[11px]">Только хост</span>
               ) : null}
               {adPlaying && (
-                <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold animate-pulse">📺 Реклама</span>
+                <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-medium animate-pulse">Реклама</span>
               )}
-              <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-white/10 hover:bg-white/15 disabled:opacity-30 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95">
+              <button onClick={handlePlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-white/10 hover:bg-white/15 disabled:opacity-30 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all active:scale-95">
                 {playerState === "playing" ? "Пауза" : "Играть"}
               </button>
-              <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/70 px-3 py-1.5 rounded-lg text-sm transition-all">-10с</button>
-              <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/70 px-3 py-1.5 rounded-lg text-sm transition-all">+10с</button>
-              <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 px-3 py-1.5 rounded-lg text-sm transition-all" title="Синхронизировать всех участников">Синхр.</button>
+              <button onClick={() => handleSeek(Math.max(0, (videoPlayerRef.current?.getCurrentTime() || 0) - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/60 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[13px]">-10</button>
+              <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/60 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[13px]">+10</button>
+              <button onClick={handleSync} disabled={!playerReady || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/40 px-2.5 py-1.5 rounded-lg text-[11px] transition-all" title="Синхронизировать всех">Синхр.</button>
               <button
                 onClick={() => {
                   const newAd = !adPlaying;
@@ -651,19 +637,19 @@ export function Room() {
                   if (newAd) socket?.emit("ad-started", code);
                   else socket?.emit("ad-ended", code);
                 }}
-                className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70"}`}
+                className={`text-[11px] px-2 py-1 rounded-lg font-medium transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"}`}
               >
                 {adPlaying ? "Реклама" : "Реклама"}
               </button>
-              <span className="text-xs text-white/40 ml-auto font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
+              <span className="text-[11px] text-white/30 ml-auto font-mono">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
             </div>
           )}
 
           {/* Upload / URL input */}
-          <div className="bg-[#12121a] rounded-xl p-3 border border-white/5">
-            <div className="flex items-center gap-3">
-              <label className="bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg px-4 py-2 cursor-pointer transition-colors font-semibold shrink-0">
-                📁 Файл
+          <div className="bg-[#12121a] rounded-xl p-2.5 border border-white/5">
+            <div className="flex items-center gap-2">
+              <label className="bg-white/5 hover:bg-white/10 text-white/60 text-[12px] rounded-lg px-3 py-2 cursor-pointer transition-all font-medium shrink-0 border border-white/5">
+                Файл
                 <input
                   type="file"
                   accept=".mp4,.webm,.mkv,.avi,.mov,.ogg,.ogv"
@@ -677,16 +663,16 @@ export function Room() {
               {uploading && (
                 <div className="flex-1 flex items-center gap-2">
                   <div className="flex-1">
-                    <div className="bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div className="bg-white/5 rounded-full h-1.5 overflow-hidden">
                       <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                    <div className="flex items-center gap-2 text-[9px] text-white/30 mt-0.5">
                       <span>{uploadProgress}%</span>
                       {uploadSpeed > 0 && <span>{formatSpeed(uploadSpeed)}</span>}
-                      {uploadRemaining && <span>ост. {uploadRemaining}</span>}
+                      {uploadRemaining && <span>{uploadRemaining}</span>}
                     </div>
                   </div>
-                  <button onClick={cancelUpload} className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded font-semibold shrink-0">✕</button>
+                  <button onClick={cancelUpload} className="bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] w-6 h-6 rounded-lg flex items-center justify-center font-bold shrink-0 transition-all">✕</button>
                 </div>
               )}
               <form
@@ -701,15 +687,12 @@ export function Room() {
                 }}
                 className="flex-1 flex gap-2"
               >
-                <input name="videoUrlD" type="text" placeholder="YouTube, RuTube или ссылка на файл..." className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shrink-0 font-semibold transition-colors">▶</button>
+                <input name="videoUrlD" type="text" placeholder="YouTube, RuTube или ссылка..." className="flex-1 bg-white/5 text-white rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-blue-500/50 min-w-0 placeholder:text-gray-600 border border-white/5 transition-all" />
+                <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg text-[13px] shrink-0 font-medium transition-all active:scale-95">▶</button>
               </form>
             </div>
             {videoUrl && (
-              <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <span className="text-green-400">●</span>
-              <span className="truncate">{videoUrl}</span>
-              </div>
+              <div className="text-[10px] text-white/20 mt-1.5 truncate px-1">{videoUrl}</div>
             )}
           </div>
 
@@ -717,46 +700,46 @@ export function Room() {
         </div>
 
         {/* Chat sidebar — fixed width, full height */}
-        <div className="w-80 flex flex-col border-l border-gray-800 p-3 gap-3">
+        <div className="w-80 flex flex-col border-l border-white/5 p-2.5 gap-2 bg-[#0a0a0f]">
           {isHost && (
-            <div className="bg-gray-800/50 rounded-lg p-2.5">
+            <div className="bg-[#12121a] rounded-xl p-2.5 border border-white/5">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={hostOnly} onChange={toggleHostOnly} className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500" />
-                <span className="text-sm text-gray-300">Только хост управляет видео</span>
+                <input type="checkbox" checked={hostOnly} onChange={toggleHostOnly} className="w-3.5 h-3.5 rounded bg-white/10 border-white/10 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-0" />
+                <span className="text-[12px] text-white/50">Только хост управляет видео</span>
               </label>
             </div>
           )}
 
           {/* Time display */}
-          <div className="bg-gray-800/50 rounded-lg p-2.5">
+          <div className="bg-[#12121a] rounded-xl p-2.5 border border-white/5">
             <div className="space-y-1">
               {peerTimes.map((peer, i) => {
                 const diff = Math.abs(peer.time - (videoPlayerRef.current?.getCurrentTime() || 0));
                 return (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-300 truncate">{peer.username}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400">{peer.isPlaying ? "▶" : "⏸"}</span>
-                      <span className={`font-mono ${diff > 1 ? "text-red-400" : "text-green-400"}`}>
+                  <div key={i} className="flex items-center justify-between text-[11px]">
+                    <span className="text-white/50 truncate">{peer.username}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-white/30">{peer.isPlaying ? "▶" : "⏸"}</span>
+                      <span className={`font-mono ${diff > 1 ? "text-red-400/80" : "text-green-400/80"}`}>
                         {formatTime(peer.time)}
                       </span>
                     </div>
                   </div>
                 );
               })}
-              {peerTimes.length === 0 && <p className="text-gray-600 text-xs">Ожидание...</p>}
+              {peerTimes.length === 0 && <p className="text-white/20 text-[11px]">Ожидание...</p>}
             </div>
           </div>
 
-          {/* Watch time this session */}
+          {/* Watch time */}
           {watchTimes.length > 0 && (
-            <div className="bg-gray-800/50 rounded-lg p-2.5">
-              <h4 className="text-gray-400 text-[11px] font-semibold mb-1 uppercase tracking-wide">⏱ Просмотрено</h4>
+            <div className="bg-[#12121a] rounded-xl p-2.5 border border-white/5">
+              <h4 className="text-white/30 text-[10px] font-medium mb-1 uppercase tracking-wider">Просмотрено</h4>
               <div className="space-y-1">
                 {watchTimes.map((wt, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-300 truncate">{wt.username}</span>
-                    <span className="text-green-400 font-mono">{formatTime(wt.seconds)}</span>
+                  <div key={i} className="flex items-center justify-between text-[11px]">
+                    <span className="text-white/50 truncate">{wt.username}</span>
+                    <span className="text-green-400/80 font-mono">{formatTime(wt.seconds)}</span>
                   </div>
                 ))}
               </div>
@@ -768,8 +751,8 @@ export function Room() {
             <Chat messages={messages} onSendMessage={(text, replyToId) => emitChatMessage(username, text, replyToId)} onReaction={handleReaction} username={username} />
           </div>
 
-          <button onClick={() => setShowCall(!showCall)} className="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-semibold hover:bg-gray-700 transition-colors border border-gray-700">
-            {showCall ? "Скрыть видеозвонок" : "Видеозвонок"}
+          <button onClick={() => setShowCall(!showCall)} className={`w-full py-2 rounded-xl text-[12px] font-medium transition-all border ${showCall ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10 hover:text-white/60"}`}>
+            {showCall ? "Скрыть звонок" : "Видеозвонок"}
           </button>
 
           {showCall && socket && <VideoCall socket={socket} roomCode={code || ""} username={username} />}
