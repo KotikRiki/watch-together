@@ -962,7 +962,7 @@ export function Room() {
           /* PORTRAIT MODE — clean minimal dark */
           <>
             {/* Video — full width, takes remaining space */}
-            <div className="relative flex-1 min-h-0 bg-black">
+            <div className="relative h-full min-h-0 bg-black">
               <VideoPlayer
                 ref={videoPlayerRef}
                 videoUrl={videoUrl}

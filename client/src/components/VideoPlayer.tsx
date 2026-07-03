@@ -391,11 +391,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // File player
     if (isFile) {
       return (
-        <div className="w-full h-full bg-black rounded-lg overflow-hidden">
+        <div className="w-full h-full bg-black overflow-hidden">
           <video
             ref={videoRef}
             src={videoUrl}
-            className="w-full h-full"
+            className="absolute inset-0 w-full h-full object-contain"
             controls
             preload="auto"
           />
@@ -405,7 +405,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     if (!videoInfo) {
       return (
-        <div className="w-full aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
+        <div className="w-full h-full bg-[#12121a] flex items-center justify-center">
           <p className="text-gray-500 text-sm">Неподдерживаемая ссылка</p>
         </div>
       );
@@ -413,16 +413,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     if (videoInfo.type === "vk") {
       return (
-        <div className="w-full aspect-video bg-gray-900 rounded-lg flex flex-col items-center justify-center gap-3 p-4">
-          <p className="text-yellow-400 text-sm font-semibold">VK Video не поддерживается для синхронизации</p>
-          <p className="text-gray-500 text-xs text-center">Используйте YouTube, RuTube или загрузите файл</p>
+        <div className="w-full h-full bg-[#12121a] flex flex-col items-center justify-center gap-3 p-4">
+          <p className="text-yellow-400 text-sm font-semibold">VK Video не поддерживается</p>
           <a
             href={`https://vk.com/video${videoInfo.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-400 text-xs hover:underline"
           >
-            Открыть на VK ↗
+            VK ↗
           </a>
         </div>
       );
@@ -452,27 +451,27 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
 
     if (videoInfo.type === "youtube") {
       return (
-        <div className="w-full h-full bg-black rounded-lg overflow-hidden relative">
-          <div ref={containerRef} className="w-full h-full" />
+        <div className="w-full h-full bg-black overflow-hidden relative">
+          <div ref={containerRef} className="absolute inset-0" />
           <a
             href={getOriginalUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded hover:bg-black/90 transition-colors"
+            className="absolute bottom-1 right-1 bg-black/60 backdrop-blur text-white/50 text-[9px] px-1.5 py-0.5 rounded hover:text-white transition-colors z-10"
           >
-            Открыть на YouTube
+            YouTube ↗
           </a>
         </div>
       );
     }
 
     return (
-      <div className="w-full h-full bg-black rounded-lg overflow-hidden relative">
+      <div className="w-full h-full bg-black overflow-hidden relative">
         <iframe
           ref={iframeRef}
           key={videoInfo.id}
           src={getSrc()}
-          className="w-full h-full"
+          className="absolute inset-0 w-full h-full"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         />
@@ -480,9 +479,9 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           href={getOriginalUrl()}
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded hover:bg-black/90 transition-colors"
+          className="absolute bottom-1 right-1 bg-black/60 backdrop-blur text-white/50 text-[9px] px-1.5 py-0.5 rounded hover:text-white transition-colors z-10"
         >
-          Открыть на RuTube
+          RuTube ↗
         </a>
       </div>
     );
