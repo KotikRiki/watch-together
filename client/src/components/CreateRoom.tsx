@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "../hooks/useTheme";
 
 export function CreateRoom() {
   const navigate = useNavigate();
+  const { theme, toggle } = useTheme();
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
@@ -36,7 +38,14 @@ export function CreateRoom() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
+          <button
+            onClick={toggle}
+            className="absolute top-0 right-0 text-2xl p-2 rounded-lg hover:bg-gray-800 transition-colors"
+            title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
           <h1 className="text-4xl font-bold text-white mb-2">
             Watch<span className="text-blue-400">Together</span>
           </h1>

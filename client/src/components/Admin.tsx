@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTheme } from "../hooks/useTheme";
 
 interface Stats {
   totalRooms: number;
@@ -43,6 +44,7 @@ interface VideoHistoryItem {
 type Tab = "stats" | "rooms" | "history" | "videoHistory" | "watchTime" | "system";
 
 export function Admin() {
+  const { theme, toggle } = useTheme();
   const [auth, setAuth] = useState<string | null>(() => localStorage.getItem("wt_admin_auth"));
   const [tab, setTab] = useState<Tab>("stats");
   const [stats, setStats] = useState<Stats | null>(null);
@@ -268,6 +270,9 @@ export function Admin() {
           <h1 className="text-lg font-bold">Админ-панель</h1>
           <div className="flex items-center gap-3">
             <a href="/" className="text-gray-400 hover:text-white text-sm">← На сайт</a>
+            <button onClick={toggle} className="text-lg p-1 hover:bg-gray-800 rounded transition-colors" title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}>
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
             <button onClick={() => setShowReset(true)} className="text-red-400 hover:text-red-300 text-sm border border-red-800 px-2 py-1 rounded">Сброс</button>
             <button onClick={logout} className="text-gray-400 hover:text-white text-sm">Выйти</button>
           </div>

@@ -11,6 +11,7 @@ export function VideoCall({ socket, roomCode, username }: VideoCallProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
 
@@ -87,7 +88,40 @@ export function VideoCall({ socket, roomCode, username }: VideoCallProps) {
       remoteVideoRef.current.srcObject = null;
     }
     setIsCallActive(false);
+    setIsScreenSharing(false);
     socket.emit("end-call", roomCode);
+  };
+
+  const toggleScreenShare = async () => {
+    if (!isCallActive || !peerConnectionRef.current || !localStreamRef.current) return;
+
+    if (isScreenSharing) {
+      const cameraTrack = localStreamRef.current.getVideoTracks()[0];
+      if (cameraTrack) {
+        const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "video");
+        if (sender) sender.replaceTrack(cameraTrack);
+        if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      setIsScreenSharing(false);
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "video");
+      if (sender) sender.replaceTrack(screenTrack);
+      if (localVideoRef.current) localVideoRef.current.srcObject = screenStream;
+      setIsScreenSharing(true);
+      screenTrack.onended = () => {
+        if (sender && localStreamRef.current) {
+          const cameraTrack = localStreamRef.current.getVideoTracks()[0];
+          if (cameraTrack) sender.replaceTrack(cameraTrack);
+          if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current;
+        }
+        setIsScreenSharing(false);
+      };
+    } catch {}
   };
 
   useEffect(() => {
@@ -196,13 +230,26 @@ export function VideoCall({ socket, roomCode, username }: VideoCallProps) {
             Позвонить
           </button>
         ) : (
-          <button
-            onClick={endCall}
-            className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-semibold active:bg-red-700 transition-colors"
-            style={{ WebkitTapHighlightColor: "transparent" }}
-          >
-            Завершить
-          </button>
+          <>
+            <button
+              onClick={toggleScreenShare}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                isScreenSharing
+                  ? "bg-yellow-600 text-white active:bg-yellow-700"
+                  : "bg-gray-700 text-white active:bg-gray-600"
+              }`}
+              style={{ WebkitTapHighlightColor: "transparent" }}
+            >
+              {isScreenSharing ? "⏹ Стоп" : "🖥 Экран"}
+            </button>
+            <button
+              onClick={endCall}
+              className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-semibold active:bg-red-700 transition-colors"
+              style={{ WebkitTapHighlightColor: "transparent" }}
+            >
+              Завершить
+            </button>
+          </>
         )}
       </div>
     </div>
