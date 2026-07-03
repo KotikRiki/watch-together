@@ -8,3 +8,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+const readyBtn = document.getElementById('ready-btn');
+if (readyBtn) readyBtn.style.display = 'inline-block';
