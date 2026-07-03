@@ -43,14 +43,11 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, onUserAction, syncAction }, ref) {
-    const containerRef = useRef<HTMLDivElement>(null);
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onExternalStateChange, onUserAction, syncAction }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const ytPlayerRef = useRef<any>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
-    const adPlayingRef = useRef(false);
     const syncActiveRef = useRef(false);
 
     const isFile = videoType === "file";
@@ -106,121 +103,48 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       };
     }, [isFile, videoUrl]);
 
-    // YouTube IFrame API
+    // YouTube postMessage API
     useEffect(() => {
       if (!videoUrl || !videoInfo || videoInfo.type !== "youtube") return;
 
-      let destroyed = false;
-
-      const loadYTAPI = () => {
-        if (window.YT && window.YT.Player) {
-          initYTPlayer();
-          return;
-        }
-        const tag = document.createElement("script");
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-        window.onYouTubeIframeAPIReady = initYTPlayer;
+      const handleMessage = (e: MessageEvent) => {
+        try {
+          const msg = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+          if (msg.event === "infoDelivery" && msg.info?.currentTime != null) {
+            currentTimeRef.current = msg.info.currentTime;
+            onTimeUpdate(msg.info.currentTime);
+          }
+          if (msg.event === "onReady") {
+            readyRef.current = true;
+            onPlayerReady?.();
+          }
+          if (msg.event === "onStateChange") {
+            const state = msg.info?.playerState;
+            if (state === 1) { // PLAYING
+              onStateChange?.("playing");
+              if (!syncActiveRef.current) {
+                onExternalStateChange?.("playing");
+                onUserAction?.("play", msg.info?.currentTime || 0);
+              }
+            } else if (state === 2) { // PAUSED
+              onStateChange?.("paused");
+              if (!syncActiveRef.current) {
+                onExternalStateChange?.("paused");
+                onUserAction?.("pause", msg.info?.currentTime || 0);
+              }
+            } else if (state === 0) { // ENDED
+              onStateChange?.("ended");
+            }
+          }
+        } catch {}
       };
 
-      const initYTPlayer = () => {
-        if (destroyed || !containerRef.current) return;
-        const existingIframe = containerRef.current.querySelector("iframe");
-        if (existingIframe) existingIframe.remove();
+      window.addEventListener("message", handleMessage);
+      readyRef.current = true;
+      onPlayerReady?.();
 
-        const div = document.createElement("div");
-        div.id = `yt-player-${videoInfo.id}-${Date.now()}`;
-        div.style.width = "100%";
-        div.style.height = "100%";
-        containerRef.current.appendChild(div);
-
-        ytPlayerRef.current = new window.YT.Player(div.id, {
-          height: "100%",
-          width: "100%",
-          videoId: videoInfo.id,
-          playerVars: { autoplay: 0, controls: 0, modestbranding: 1, rel: 0, disablekb: 1, fs: 0 },
-          events: {
-            onReady: () => {
-              if (!destroyed) {
-                readyRef.current = true;
-                onPlayerReady?.();
-              }
-            },
-            onStateChange: (e: any) => {
-              if (destroyed) return;
-
-              // Detect YouTube ads
-              try {
-                const ytState = e.data;
-                let isAd = false;
-
-                // Method 1: getAdPlaying() — official API
-                try {
-                  if (typeof ytPlayerRef.current?.getAdPlaying === "function") {
-                    isAd = ytPlayerRef.current.getAdPlaying();
-                  }
-                } catch {}
-
-                // Method 2: video_id mismatch — ad plays a different video
-                if (!isAd) {
-                  try {
-                    const videoData = ytPlayerRef.current?.getVideoData?.();
-                    if (videoData?.video_id && videoInfo && videoData.video_id !== videoInfo.id) {
-                      isAd = true;
-                    }
-                  } catch {}
-                }
-
-                // Method 3: duration <= 31s and playing from 0 = likely ad
-                if (!isAd && ytState === window.YT.PlayerState.PLAYING) {
-                  try {
-                    const dur = ytPlayerRef.current?.getDuration?.() || 0;
-                    const cur = ytPlayerRef.current?.getCurrentTime?.() || 0;
-                    if (dur > 0 && dur <= 31 && cur < 1) {
-                      isAd = true;
-                    }
-                  } catch {}
-                }
-
-                // Reset ad flag when video plays past 2 seconds
-                if (ytState === window.YT.PlayerState.PLAYING) {
-                  try {
-                    const cur = ytPlayerRef.current?.getCurrentTime?.() || 0;
-                    if (cur > 2) isAd = false;
-                  } catch {}
-                }
-
-                if (isAd !== adPlayingRef.current) {
-                  adPlayingRef.current = isAd;
-                  onAdStateChange?.(isAd);
-                }
-              } catch {}
-
-              if (e.data === window.YT.PlayerState.PLAYING) {
-                onStateChange?.("playing");
-                if (!syncActiveRef.current) {
-                  onExternalStateChange?.("playing");
-                  onUserAction?.("play", ytPlayerRef.current?.getCurrentTime?.() || 0);
-                }
-              } else if (e.data === window.YT.PlayerState.PAUSED) {
-                onStateChange?.("paused");
-                if (!syncActiveRef.current) {
-                  onExternalStateChange?.("paused");
-                  onUserAction?.("pause", ytPlayerRef.current?.getCurrentTime?.() || 0);
-                }
-              } else if (e.data === window.YT.PlayerState.ENDED) {
-                onStateChange?.("ended");
-              }
-            },
-          },
-        });
-      };
-
-      loadYTAPI();
       return () => {
-        destroyed = true;
-        ytPlayerRef.current?.destroy?.();
-        ytPlayerRef.current = null;
+        window.removeEventListener("message", handleMessage);
         readyRef.current = false;
       };
     }, [videoUrl, videoInfo?.id]);
@@ -272,8 +196,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           videoRef.current.currentTime = syncAction.time;
           videoRef.current.play();
         } else if (videoInfo?.type === "youtube") {
-          ytPlayerRef.current?.seekTo?.(syncAction.time, true);
-          ytPlayerRef.current?.playVideo?.();
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [syncAction.time, true] }), "*");
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
         } else if (videoInfo?.type === "rutube") {
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
@@ -285,8 +209,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           videoRef.current.currentTime = syncAction.time;
           videoRef.current.pause();
         } else if (videoInfo?.type === "youtube") {
-          ytPlayerRef.current?.seekTo?.(syncAction.time, true);
-          ytPlayerRef.current?.pauseVideo?.();
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [syncAction.time, true] }), "*");
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
         } else if (videoInfo?.type === "rutube") {
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
           iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
@@ -296,8 +220,11 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         currentTimeRef.current = syncAction.time;
         if (isFile && videoRef.current) {
           videoRef.current.currentTime = syncAction.time;
-        } else if (videoInfo?.type === "youtube") ytPlayerRef.current?.seekTo?.(syncAction.time, true);
-        else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
+        } else if (videoInfo?.type === "youtube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [syncAction.time, true] }), "*");
+        } else if (videoInfo?.type === "rutube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time: syncAction.time } }), "*");
+        }
       }
     }, [syncAction, videoInfo?.type, isFile]);
 
@@ -306,7 +233,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       play: () => {
         if (!readyRef.current) return false;
         if (isFile) videoRef.current?.play();
-        else if (videoInfo?.type === "youtube") ytPlayerRef.current?.playVideo?.();
+        else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
         onStateChange?.("playing");
         return true;
@@ -314,7 +241,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       pause: () => {
         if (!readyRef.current) return false;
         if (isFile) videoRef.current?.pause();
-        else if (videoInfo?.type === "youtube") ytPlayerRef.current?.pauseVideo?.();
+        else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
         onStateChange?.("paused");
         return true;
@@ -324,15 +251,15 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         currentTimeRef.current = time;
         if (isFile && videoRef.current) {
           videoRef.current.currentTime = time;
-        } else if (videoInfo?.type === "youtube") ytPlayerRef.current?.seekTo?.(time, true);
-        else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time } }), "*");
+        } else if (videoInfo?.type === "youtube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [time, true] }), "*");
+        } else if (videoInfo?.type === "rutube") {
+          iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:setCurrentTime", data: { time } }), "*");
+        }
         return true;
       },
       getCurrentTime: () => {
         if (isFile && videoRef.current) return videoRef.current.currentTime;
-        if (videoInfo?.type === "youtube" && ytPlayerRef.current?.getCurrentTime) {
-          return ytPlayerRef.current.getCurrentTime();
-        }
         return currentTimeRef.current;
       },
       isReady: () => readyRef.current,
@@ -452,7 +379,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     if (videoInfo.type === "youtube") {
       return (
         <div className="w-full h-full bg-black overflow-hidden relative">
-          <div ref={containerRef} className="absolute inset-0" />
+          <iframe
+            ref={iframeRef}
+            key={videoInfo.id}
+            src={`https://www.youtube.com/embed/${videoInfo.id}?enablejsapi=1&controls=1&modestbranding=1&rel=0&fs=1&playsinline=1`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+          />
           <a
             href={getOriginalUrl()}
             target="_blank"
