@@ -41,7 +41,7 @@ interface VideoHistoryItem {
   created_at: string; roomCode?: string;
 }
 
-type Tab = "stats" | "rooms" | "history" | "videoHistory" | "watchTime" | "system";
+type Tab = "stats" | "rooms" | "history" | "videoHistory" | "watchTime" | "system" | "stickers";
 
 export function Admin() {
   const { theme, toggle } = useTheme();
@@ -74,6 +74,9 @@ export function Admin() {
   const [toast, setToast] = useState("");
   const [watchTimeGroup, setWatchTimeGroup] = useState<"video" | "user" | "detail">("video");
   const [watchTimeData, setWatchTimeData] = useState<any>(null);
+  const [stickerPacks, setStickerPacks] = useState<{ name: string; title: string; stickerCount: number }[]>([]);
+  const [stickerBotOk, setStickerBotOk] = useState(false);
+  const [newPackName, setNewPackName] = useState("");
 
   const headers: Record<string, string> = auth ? { Authorization: `Basic ${auth}` } : {};
 
@@ -160,6 +163,46 @@ export function Admin() {
     } catch {}
   };
 
+  const fetchStickerPacks = useCallback(async () => {
+    try {
+      const r = await fetch("/api/stickers/admin/list", { headers });
+      if (r.ok) {
+        const d = await r.json();
+        setStickerPacks(d.packs || []);
+        setStickerBotOk(d.botTokenConfigured);
+      }
+    } catch {}
+  }, [auth]);
+
+  const clearStickerCache = async () => {
+    try {
+      const r = await fetch("/api/stickers/admin/clear", { ...headers, method: "POST" });
+      if (r.ok) { showToast("Кеш стикеров очищен"); fetchStickerPacks(); }
+    } catch {}
+  };
+
+  const loadStickerPack = async () => {
+    if (!newPackName.trim()) return;
+    try {
+      const r = await fetch("/api/stickers/admin/load", {
+        ...headers,
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ packName: newPackName.trim() }),
+      });
+      if (r.ok) { showToast("Пак загружен"); setNewPackName(""); fetchStickerPacks(); }
+      else { const d = await r.json(); showToast(d.error || "Ошибка"); }
+    } catch {}
+  };
+
+  const removeStickerPack = async (packName: string) => {
+    if (!confirm(`Удалить пак ${packName} из кеша?`)) return;
+    try {
+      const r = await fetch(`/api/stickers/admin/${encodeURIComponent(packName)}`, { ...headers, method: "DELETE" });
+      if (r.ok) { showToast("Пак удалён"); fetchStickerPacks(); }
+    } catch {}
+  };
+
   const deleteRoom = async (code: string) => {
     if (!confirm(`Удалить комнату ${code}? Все сообщения и файлы будут удалены.`)) return;
     try {
@@ -197,6 +240,7 @@ export function Admin() {
     if (tab === "history") fetchHistory();
     if (tab === "videoHistory") fetchVideoHistory();
     if (tab === "watchTime") fetchWatchTime();
+    if (tab === "stickers") fetchStickerPacks();
     if (tab === "system") fetchSystem();
   }, [auth, tab]);
 
@@ -256,6 +300,7 @@ export function Admin() {
     { id: "history", label: "💬 Сообщения" },
     { id: "videoHistory", label: "🎬 Видео" },
     { id: "watchTime", label: "⏱ Время" },
+    { id: "stickers", label: "🎨 Стикеры" },
     { id: "system", label: "🖥 Сервер" },
   ];
 
@@ -541,6 +586,73 @@ export function Admin() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* === STICKERS === */}
+        {tab === "stickers" && (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold">Telegram Sticker Packs</h3>
+                <span className={stickerBotOk ? "text-green-400 text-xs" : "text-red-400 text-xs"}>
+                  Bot: {stickerBotOk ? "✓ Настроен" : "✗ Не настроен"}
+                </span>
+              </div>
+
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newPackName}
+                  onChange={(e) => setNewPackName(e.target.value)}
+                  placeholder="Имя пака (напр. Animals)"
+                  className="flex-1 bg-gray-800 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={loadStickerPack}
+                  disabled={!newPackName.trim() || !stickerBotOk}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Загрузить
+                </button>
+                <button
+                  onClick={clearStickerCache}
+                  className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-600"
+                >
+                  Очистить кеш
+                </button>
+              </div>
+
+              {stickerPacks.length === 0 ? (
+                <p className="text-gray-500 text-sm">Нет загруженных паков в кеше</p>
+              ) : (
+                <div className="space-y-2">
+                  {stickerPacks.map((pack) => (
+                    <div key={pack.name} className="bg-gray-800 rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <span className="text-white font-semibold text-sm">{pack.title || pack.name}</span>
+                        <span className="text-gray-400 text-xs ml-2">{pack.stickerCount} стикеров</span>
+                        <p className="text-gray-500 text-xs font-mono mt-0.5">{pack.name}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setNewPackName(pack.name); }}
+                          className="text-gray-400 hover:text-white text-xs px-2"
+                        >
+                          📋
+                        </button>
+                        <button
+                          onClick={() => removeStickerPack(pack.name)}
+                          className="text-red-400 hover:text-red-300 text-xs px-2"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
