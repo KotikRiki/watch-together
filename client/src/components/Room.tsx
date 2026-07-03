@@ -170,7 +170,7 @@ export function Room() {
       setLandscapeBarsVisible(true);
     }
     return () => { if (landscapeBarsTimerRef.current) clearTimeout(landscapeBarsTimerRef.current); };
-  }, [isLandscape, landscapeChatOpen, showCall, playerState]);
+  }, [isLandscape, landscapeChatOpen, showCall]);
 
   const resetLandscapeBars = () => {
     setLandscapeBarsVisible(true);
@@ -1092,16 +1092,24 @@ export function Room() {
           </div>
         )}
 
-        {/* Chat overlay — peek / expanded */}
-        <div
-          className={`absolute left-0 right-0 z-20 transition-all duration-300 ease-out ${
-            chatExpanded ? "top-[15%] bottom-0" : "bottom-[52px]"
-          }`}
-          style={{ touchAction: chatExpanded ? "none" : "auto" }}
-        >
-          {chatExpanded ? (
-            /* Expanded chat — full overlay */
-            <div className="h-full flex flex-col bg-black/40 backdrop-blur-lg rounded-t-2xl overflow-hidden">
+        {/* Chat overlay — floating button / expanded */}
+        {!isLandscape && (
+          <>
+            {/* Floating chat button */}
+            {!chatExpanded && (
+              <button
+                onClick={() => setChatExpanded(true)}
+                className="absolute bottom-4 right-4 z-30 w-12 h-12 rounded-full bg-blue-600/90 backdrop-blur text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-90 transition-transform"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>
+                )}
+              </button>
+            )}
+            {/* Expanded chat — full overlay */}
+            {chatExpanded && (
+              <div className="absolute inset-0 z-30 flex flex-col bg-[#0a0a0f]/95 backdrop-blur-xl pt-12 pb-20">
               {/* Close button */}
               <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0">
                 <span className="text-gray-400 text-xs font-semibold">💬 Чат</span>
@@ -1244,38 +1252,9 @@ export function Room() {
                 <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shrink-0">→</button>
               </form>
             </div>
-          ) : (
-            /* Peek — last 2 messages + tap to expand */
-            <button
-              onClick={() => setChatExpanded(true)}
-              className="w-full text-left bg-black/20 backdrop-blur-sm px-3 py-2 rounded-t-xl border-t border-white/10"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-white/60 text-xs">💬 Чат</span>
-                {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
-                    {unreadCount}
-                  </span>
-                )}
-                {unreadCount === 0 && messages.length > 0 && (
-                  <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    {messages.length}
-                  </span>
-                )}
-                <span className="text-white/40 text-[10px] ml-auto">нажмите чтобы открыть</span>
-              </div>
-              {messages.slice(-2).map((msg, i) => (
-                <div key={msg.id || i} className="text-white/80 text-xs truncate">
-                  <span className="text-blue-400 font-medium">{msg.author}:</span>{" "}
-                  {msg.text.startsWith("[sticker]") ? "🖼 стикер" : msg.text}
-                </div>
-              ))}
-              {messages.length === 0 && (
-                <span className="text-white/30 text-xs">Напишите первое сообщение...</span>
-              )}
-            </button>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
 
       <style>{`
@@ -1285,7 +1264,7 @@ export function Room() {
         }
         @keyframes phoneRotate {
           0%, 100% { transform: rotate(0deg); }
-          50% { transform: rotate(90deg); }
+          50% { transform: rotate(-90deg); }
         }
         @keyframes float-up {
           0% { opacity:1; transform:translateY(0) scale(1); }
