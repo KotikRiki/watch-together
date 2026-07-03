@@ -51,6 +51,15 @@ app.get("/reset-pwa", (_req, res) => {
   );
 });
 
+app.get("/sw.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "application/javascript");
+  res.send(
+    "self.addEventListener('install',function(e){self.skipWaiting()});" +
+    "self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim())});"
+  );
+});
+
 const possiblePaths = [
   path.join(process.cwd(), "../client/dist"),
   path.join(process.cwd(), "client/dist"),
