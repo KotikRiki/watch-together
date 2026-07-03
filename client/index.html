@@ -21,7 +21,37 @@
         });
       }
     </script>
-    <div id="root"></div>
+    <div id="root">
+      <div style="background:#0a0a0f;color:#fff;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box">
+        <div style="text-align:center;max-width:360px">
+          <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.1);border-top-color:#3b82f6;border-radius:50%;margin:0 auto 24px;animation:spin 0.8s linear infinite"></div>
+          <div style="font-size:15px;color:rgba(255,255,255,0.9);margin-bottom:8px;font-weight:500">Загрузка...</div>
+          <div id="joke" style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.5;min-height:40px"></div>
+        </div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      <script>
+        var jokes=[
+          "Программист это тот, кто решает проблему, о которой ты не знал, способом, который ты не понимаешь.",
+          "- Дорогой, почему ты всегда сидишь с ноутбуком?\n- Потому что у меня проблемы с отцом.\n- С каким отцом?\n- С Process Explorer.",
+          "Жена программисту: \"Сходи в магазин, купи батон хлеба. Если будут яйца — возьми десяток.\"\nОн вернулся с десятью батонами.",
+          "Почему программисты путают Хеллоуин и Рождество?\nПотому что Oct 31 == Dec 25.",
+          "Программист: \"У меня нет друзей, только коллеги и баги.\"",
+          "Три самые большие лжи в IT: \"Это легко\", \"Последний коммит\" и \"Я прочитал документацию\".",
+          "Код работает? Не трогай его!",
+          "Программист — это машина, которая превращает кофе в код.",
+          "Нечего бояться кроме самого страха... и NullPointerException.",
+          "10 типов людей: те кто понимают двоичную систему и те кто нет.",
+          "Тестировщик заходит в бар. Заказывает 0 пива. Получает -1 пиво. Бар взрывается.",
+          "Кодинг в 3 часа ночи:\n1. Всё работает\n2. Ложишься спать\n3. Утром ничего не работает\n4. Непонятно почему",
+          "Одна оптимизация — хорошо, две — уже рефакторинг, три — баг-фикс.",
+          "Люди говорят: \"Почему ты не спишь?\" Я говорю: \"Потому что баг не спит.\"",
+          "Git commit -m \"Тут всё работает, не трогай\"",
+          "Жизнь программиста: ошибки, ошибки, ошибки... и вдруг — компилируется!"
+        ];
+        document.getElementById('joke').textContent=jokes[Math.floor(Math.random()*jokes.length)];
+      </script>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
