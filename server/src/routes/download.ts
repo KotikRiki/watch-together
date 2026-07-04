@@ -113,7 +113,8 @@ downloadRouter.get("/progress/:hash", (req, res) => {
 });
 
 downloadRouter.get("/stream/:filename", (req, res) => {
-  const filePath = path.join(downloadDir, req.params.filename);
+  const safeName = path.basename(req.params.filename);
+  const filePath = path.join(downloadDir, safeName);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Not found" });
 
   const stat = fs.statSync(filePath);

@@ -77,7 +77,7 @@ export function useSocket(roomCode: string | null) {
 
   const emitQueueNext = () => {
     if (socketRef.current && roomCode) {
-      socketRef.current.emit("remove-from-queue", roomCode);
+      socketRef.current.emit("play-next", roomCode);
     }
   };
 

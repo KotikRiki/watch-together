@@ -92,11 +92,13 @@ export function Room() {
       setIsMobile(isSmallScreen || (isTouchDevice && isMobileUA));
     };
     check();
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", () => setTimeout(check, 100));
+    const onResize = () => check();
+    const onOrientation = () => setTimeout(check, 100);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onOrientation);
     return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onOrientation);
     };
   }, []);
 
@@ -354,31 +356,31 @@ export function Room() {
     }
   }, [playerReady]);
 
-  // Heartbeat: send current time every 3-5 seconds + request watch time every 10s
+  // Heartbeat: use refs to avoid recreating interval
+  const adPlayingRef = useRef(adPlaying);
+  adPlayingRef.current = adPlaying;
+
   useEffect(() => {
     if (!socket || !playerReady) return;
-
-    // In landscape, slow down heartbeat to reduce network noise
     const interval = isLandscape ? 5000 : 3000;
     let tick = 0;
     heartbeatIntervalRef.current = setInterval(() => {
       const time = videoPlayerRef.current?.getCurrentTime() || 0;
-      if (!adPlaying) {
-        socket.emit("heartbeat", code, time, playerState === "playing");
+      if (!adPlayingRef.current) {
+        socket.emit("heartbeat", code, time, playerStateRef.current === "playing");
       }
-      socket.emit("user-time", code, time, playerState === "playing", username);
+      socket.emit("user-time", code, time, playerStateRef.current === "playing", username);
       tick++;
       if (tick % 3 === 0) {
         socket.emit("get-watch-time", code);
       }
     }, interval);
-
     return () => {
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [socket, code, playerReady, playerState, username, adPlaying, videoType, isLandscape]);
+  }, [socket, code, playerReady, username, isLandscape]);
 
   const handleLogin = (name: string) => {
     localStorage.setItem("wt_username", name);

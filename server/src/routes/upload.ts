@@ -58,7 +58,8 @@ uploadRouter.post("/", upload.single("video"), async (req, res) => {
 
 export function setupUploadServing(app: any) {
   app.use("/uploads", (req: any, res: any, next: any) => {
-    const filePath = path.join(uploadDir, req.url);
+    const safeName = path.basename(req.url);
+    const filePath = path.join(uploadDir, safeName);
     if (!fs.existsSync(filePath)) return next();
 
     const stat = fs.statSync(filePath);

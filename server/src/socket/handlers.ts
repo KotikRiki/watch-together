@@ -9,6 +9,7 @@ interface RoomState {
   users: Set<string>;
   usernames: Map<string, string>;
   hostSocketId: string | null;
+  hostId: string | null;
   hostOnly: boolean;
   lastSyncTime: number;
   userTimes: Map<string, { time: number; isPlaying: boolean; username: string }>;
@@ -60,6 +61,7 @@ export function setupSocketHandlers(io: Server) {
           users: new Set(),
           usernames: new Map(),
           hostSocketId: null,
+          hostId: null,
           hostOnly: false,
           lastSyncTime: 0,
           userTimes: new Map(),
@@ -74,6 +76,7 @@ export function setupSocketHandlers(io: Server) {
 
       if (isFirstUser) {
         roomState.hostSocketId = socket.id;
+        roomState.hostId = username;
         socket.emit("host-changed", { isHost: true });
       }
 
@@ -190,12 +193,18 @@ export function setupSocketHandlers(io: Server) {
     socket.on("ad-started", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
+      const socketUsername = roomState.usernames.get(socket.id);
+      const hostUsername = roomState.usernames.get(roomState.hostId || "");
+      if (socketUsername !== hostUsername) return;
       io.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
     socket.on("ad-ended", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
+      const socketUsername = roomState.usernames.get(socket.id);
+      const hostUsername = roomState.usernames.get(roomState.hostId || "");
+      if (socketUsername !== hostUsername) return;
       io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
@@ -269,6 +278,11 @@ export function setupSocketHandlers(io: Server) {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
 
+      // Only host can play next
+      const socketUsername = roomState.usernames.get(socket.id);
+      const hostUsername = roomState.usernames.get(roomState.hostId || "");
+      if (socketUsername !== hostUsername) return;
+
       const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
       if (roomResult.rows.length === 0) return;
       const roomId = roomResult.rows[0].id;
@@ -302,7 +316,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.currentTime = 0;
       roomState.isPlaying = true;
 
-      io.to(roomCode).emit("video-changed", { videoUrl: next.url, videoType: "embed" });
+      io.to(roomCode).emit("video-changed", { videoUrl: next.url, videoType: /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(next.url) ? "file" : "embed" });
       io.to(roomCode).emit("queue-updated", { action: "next", removedItem: { id: next.id, url: next.url, title: next.title } });
     });
 
