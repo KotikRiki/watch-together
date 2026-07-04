@@ -674,7 +674,7 @@ export function Room() {
         </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
-      <div ref={desktopContainerRef} className={`${isMobile ? "hidden" : "flex"} flex-1 gap-0 min-h-0`}>
+      {!isMobile && <div ref={desktopContainerRef} className="flex flex-1 gap-0 min-h-0">
         {/* Video column — takes all available space */}
         <div className="flex-1 flex flex-col min-w-0 p-3 pr-1.5 gap-2">
           {/* Video player */}
@@ -903,7 +903,7 @@ export function Room() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Mobile layout — full-screen video + chat overlay */}
       <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${isLandscape ? "top-0" : "top-[52px]"}`} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
