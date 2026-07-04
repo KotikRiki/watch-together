@@ -123,9 +123,10 @@ adminRouter.get("/system", async (_req, res) => {
 
   let nginxOk = false;
   try {
-    const { execSync } = require("child_process");
-    execSync("systemctl is-active nginx", { timeout: 3000 });
-    nginxOk = true;
+    const { exec } = require("child_process");
+    nginxOk = await new Promise<boolean>((resolve) => {
+      exec("systemctl is-active nginx", { timeout: 3000 }, (err: any) => resolve(!err));
+    });
   } catch {}
 
   res.json({

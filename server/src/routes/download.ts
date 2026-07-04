@@ -15,6 +15,17 @@ downloadRouter.post("/", (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: "No URL" });
 
+  // SSRF protection: block internal URLs
+  const blocked = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|169\.254\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/i;
+  try {
+    const parsed = new URL(url);
+    if (blocked.test(parsed.hostname) || parsed.protocol === "file:") {
+      return res.status(403).json({ error: "URL not allowed" });
+    }
+  } catch {
+    return res.status(400).json({ error: "Invalid URL" });
+  }
+
   const hash = crypto.createHash("md5").update(url).digest("hex").slice(0, 12);
   const filename = `${hash}.mp4`;
   const outputPath = path.join(downloadDir, filename);

@@ -99,7 +99,7 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
                   {msg.text}
                   <button
                     onClick={() => setReplyTo(replyTo?.id === msg.id ? null : msg)}
-                    className={`absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gray-800 text-gray-400 hover:text-white text-[10px] items-center justify-center hidden group-hover:flex transition-colors ${
+                    className={`absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gray-800 text-gray-400 hover:text-white text-[10px] items-center justify-center flex sm:hidden group-hover:flex transition-colors ${
                       replyTo?.id === msg.id ? "!flex bg-blue-600 text-white" : ""
                     }`}
                   >

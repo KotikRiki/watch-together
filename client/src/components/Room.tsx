@@ -275,7 +275,10 @@ export function Room() {
     });
 
     on("new-message", (message: Message) => {
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => {
+        const next = [...prev, message];
+        return next.length > 200 ? next.slice(-200) : next;
+      });
       if (!chatExpandedRef.current) {
         setUnreadCount((c) => {
           const next = c + 1;
@@ -949,7 +952,7 @@ export function Room() {
 
         {/* ============ LANDSCAPE OVERLAYS ============ */}
         {isLandscape && (
-          <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars}>
+          <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars} onClick={() => { resetLandscapeBars(); }}>
             {/* Top bar — hidden for file videos, only chat */}
             {videoType !== "file" && (
               <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
