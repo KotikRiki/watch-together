@@ -540,10 +540,11 @@ export function Room() {
     if (!canControl) return;
     const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    // Imperative call for local player
+    if (action === "play") videoPlayerRef.current?.play();
+    else videoPlayerRef.current?.pause();
     // Send to server for other users
     emitVideoAction(action, time);
-    // Also apply locally via syncAction (same pipeline as other users)
-    setSyncAction({ action, time });
     lastUserActionRef.current = Date.now();
   };
 
