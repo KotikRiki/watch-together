@@ -458,7 +458,7 @@ export function Room() {
 
       const result = await promise;
       const fullUrl = `${apiUrl}${result.url}`;
-      emitChangeVideo(fullUrl, "file");
+      emitQueueAdd(fullUrl, result.originalName || "Загруженное видео");
     } catch (err) {
       console.error("Upload failed:", err);
       alert("Ошибка загрузки файла");
@@ -538,20 +538,13 @@ export function Room() {
 
   const handlePlayPause = () => {
     if (!canControl) return;
-    const isPlaying = playerState === "playing";
+    const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    if (isPlaying) {
-      videoPlayerRef.current?.pause();
-      emitVideoAction("pause", time);
-    } else {
-      videoPlayerRef.current?.play();
-      emitVideoAction("play", time);
-    }
-    lastSyncEventRef.current = Date.now();
-    lastExternalChangeRef.current = Date.now();
+    // Send to server for other users
+    emitVideoAction(action, time);
+    // Also apply locally via syncAction (same pipeline as other users)
+    setSyncAction({ action, time });
     lastUserActionRef.current = Date.now();
-    syncFromActionRef.current = true;
-    setTimeout(() => { syncFromActionRef.current = false; }, 500);
   };
 
   const handleSeek = (time: number) => {
@@ -928,17 +921,17 @@ export function Room() {
             syncAction={syncAction}
           />
 
-          {/* Custom controls overlay for file videos on mobile */}
-          {videoType === "file" && videoUrl && (
+          {/* Custom controls overlay for file videos — only chat button */}
+          {videoType === "file" && videoUrl && !isLandscape && (
             <div className="absolute inset-0 z-20">
               {/* Tap to play/pause */}
               <div className="absolute inset-0 pointer-events-auto" onClick={() => handlePlayPause()} />
 
-              {/* Chat button — always visible, top right */}
+              {/* Chat button — top right */}
               <div className="absolute top-3 right-3 pointer-events-auto">
-                <button onClick={(e) => { e.stopPropagation(); isLandscape ? setLandscapeChatOpen(!landscapeChatOpen) : setChatExpanded(!chatExpanded); }} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
+                <button onClick={(e) => { e.stopPropagation(); setChatExpanded(!chatExpanded); }} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  {unreadCount > 0 && !chatExpanded && !landscapeChatOpen && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                  {unreadCount > 0 && !chatExpanded && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
                 </button>
               </div>
             </div>
@@ -984,7 +977,7 @@ export function Room() {
                       {unreadCount > 0 && !landscapeChatOpen && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
                     </button>
                     <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
                     </button>
                     <button onClick={toggleFullscreen} className="w-8 h-8 rounded-full bg-white/10 text-white/60 flex items-center justify-center hover:text-white transition-all">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
@@ -1195,7 +1188,7 @@ export function Room() {
         {showRotateHint && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" onClick={() => setShowRotateHint(false)}>
             <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative animate-[phoneRotate_1.5s_ease-in-out_infinite]">
+              <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative" style={{ transformOrigin: "center center", animation: "phoneRotate 1.5s ease-in-out infinite" }}>
                 <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
                 <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
               </div>
@@ -1229,7 +1222,7 @@ export function Room() {
             )}
             {/* Expanded chat — full overlay */}
             {chatExpanded && (
-              <div className="absolute inset-0 z-30 flex flex-col bg-[#0a0a0f]/95 backdrop-blur-xl pt-12 pb-20">
+              <div className="absolute inset-0 z-30 flex flex-col bg-[#0a0a0f]/40 backdrop-blur-xl pt-12 pb-20">
               {/* Close button */}
               <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0">
                 <span className="text-gray-400 text-xs font-semibold">💬 Чат</span>
@@ -1384,7 +1377,7 @@ export function Room() {
         }
         @keyframes phoneRotate {
           0%, 100% { transform: rotate(0deg); }
-          50% { transform: rotate(-90deg); }
+          50% { transform: rotate(90deg); }
         }
         @keyframes float-up {
           0% { opacity:1; transform:translateY(0) scale(1); }

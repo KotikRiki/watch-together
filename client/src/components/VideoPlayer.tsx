@@ -232,23 +232,18 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // Imperative methods
     useImperativeHandle(ref, () => ({
       play: () => {
-        if (!readyRef.current) return false;
         if (isFile) videoRef.current?.play();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
-        onStateChange?.("playing");
         return true;
       },
       pause: () => {
-        if (!readyRef.current) return false;
         if (isFile) videoRef.current?.pause();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
-        onStateChange?.("paused");
         return true;
       },
       seek: (time: number) => {
-        if (!readyRef.current) return false;
         currentTimeRef.current = time;
         if (isFile && videoRef.current) {
           videoRef.current.currentTime = time;
