@@ -11,12 +11,13 @@ interface QueueProps {
   queue: QueueItem[];
   onAddVideo: (url: string, title?: string) => void;
   onNext: () => void;
+  onDeleteItem?: (id: string) => void;
   onDownloadToServer?: (url: string) => void;
   downloading?: boolean;
   downloadProgress?: string | null;
 }
 
-export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloading, downloadProgress }: QueueProps) {
+export function Queue({ queue, onAddVideo, onNext, onDeleteItem, onDownloadToServer, downloading, downloadProgress }: QueueProps) {
   const [newUrl, setNewUrl] = useState("");
 
   const handleAdd = () => {
@@ -83,6 +84,9 @@ export function Queue({ queue, onAddVideo, onNext, onDownloadToServer, downloadi
               <span className="text-white text-sm flex-1 truncate">
                 {item.title || item.url}
               </span>
+              {onDeleteItem && (
+                <button onClick={() => onDeleteItem(item.id)} className="text-white/30 hover:text-red-400 text-xs px-1">✕</button>
+              )}
             </div>
           ))
         )}

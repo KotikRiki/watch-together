@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { StickerPanel } from "./StickerPanel";
 
 interface Message {
@@ -49,6 +49,12 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
     setShowStickers(false);
   };
 
+  const replyMap = useMemo(() => {
+    const m = new Map<string, Message>();
+    messages.forEach(msg => m.set(msg.id, msg));
+    return m;
+  }, [messages]);
+
   return (
     <div className="flex flex-col h-full bg-gray-900 rounded-lg">
       <div className="p-3 border-b border-gray-700">
@@ -60,7 +66,7 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
           <p className="text-gray-600 text-xs text-center mt-4">Пока нет сообщений</p>
         )}
         {messages.map((msg) => {
-          const replyMsg = msg.replyToId ? messages.find((m) => m.id === msg.replyToId) : null;
+          const replyMsg = msg.replyToId ? replyMap.get(msg.replyToId) || null : null;
           return (
             <div
               key={msg.id}

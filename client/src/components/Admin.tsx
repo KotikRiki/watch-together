@@ -277,7 +277,7 @@ export function Admin() {
 
   useEffect(() => {
     if (!auth || tab !== "system") return;
-    const iv = setInterval(fetchSystem, 3000);
+    const iv = setInterval(() => { if (!document.hidden) fetchSystem(); }, 3000);
     return () => clearInterval(iv);
   }, [auth, tab, fetchSystem]);
 

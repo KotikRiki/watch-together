@@ -359,6 +359,13 @@ export function Room() {
     }
   }, [playerReady]);
 
+  // Warn before leaving
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
   // Heartbeat: use refs to avoid recreating interval
   const adPlayingRef = useRef(adPlaying);
   adPlayingRef.current = adPlaying;
@@ -391,6 +398,7 @@ export function Room() {
   };
 
   const handleUploadFile = async (file: File) => {
+    if (file.size > 500 * 1024 * 1024) { alert("Файл слишком большой (макс. 500 МБ)"); return; }
     setUploading(true);
     setUploadProgress(0);
     setUploadSpeed(0);
@@ -453,6 +461,7 @@ export function Room() {
       emitChangeVideo(fullUrl, "file");
     } catch (err) {
       console.error("Upload failed:", err);
+      alert("Ошибка загрузки файла");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -807,7 +816,7 @@ export function Room() {
             )}
           </div>
 
-          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDownloadToServer={handleDownloadToServer} downloading={downloading} downloadProgress={downloadProgress} />
+          <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDeleteItem={(id) => { socket?.emit("queue-remove", code, id); setQueue(prev => prev.filter(item => item.id !== id)); }} onDownloadToServer={handleDownloadToServer} downloading={downloading} downloadProgress={downloadProgress} />
         </div>
 
         {/* Chat sidebar */}
@@ -893,7 +902,7 @@ export function Room() {
       </div>
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${isLandscape ? "top-0" : "top-[52px]"}`}>
+      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${isLandscape ? "top-0" : "top-[52px]"}`} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
 
         {/* SINGLE VideoPlayer — always mounted, never remounts */}
         <div className={`${isLandscape ? "absolute inset-0 z-10" : "relative flex-1 min-h-0 bg-black"}`}>
@@ -1075,7 +1084,7 @@ export function Room() {
             )}
 
             {/* Emoji bar — collapsible, right side in landscape */}
-            <div className="pointer-events-auto absolute bottom-16 right-3 z-30 flex flex-col items-end gap-1">
+            <div className="pointer-events-auto absolute bottom-16 right-3 z-30 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
               {landscapeEmojiOpen && (
                 <div className="flex flex-col gap-1 bg-[#0f0f18]/90 backdrop-blur-lg rounded-2xl px-1.5 py-2 border border-white/5 animate-[slideUp_0.15s_ease-out]">
                   {EMOJI_REACTIONS.map((emoji) => (
