@@ -43,16 +43,12 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, onUserAction, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onExternalStateChange, onUserAction, syncAction }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
     const syncActiveRef = useRef(false);
-    const lastAdCheckRef = useRef(0);
-    const staleTimeCountRef = useRef(0);
-    const isAdRef = useRef(false);
-    const lastVideoTimeRef = useRef(0);
 
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
@@ -83,34 +79,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         }
       };
       const onEnded = () => { onStateChange?.("ended"); };
-      const onTime = () => {
-        currentTimeRef.current = vid.currentTime;
-        const now = Date.now();
-        if (now - lastAdCheckRef.current > 1000) {
-          const timeDelta = vid.currentTime - lastVideoTimeRef.current;
-          if (timeDelta > 0.2 && timeDelta < 5) {
-            staleTimeCountRef.current = 0;
-            if (isAdRef.current) {
-              isAdRef.current = false;
-              onAdStateChange?.(false);
-            }
-          } else if (timeDelta < 0.1) {
-            staleTimeCountRef.current++;
-            if (staleTimeCountRef.current >= 5 && !isAdRef.current) {
-              isAdRef.current = true;
-              onAdStateChange?.(true);
-            }
-          } else if (timeDelta > 10) {
-            staleTimeCountRef.current = 0;
-            if (isAdRef.current) {
-              isAdRef.current = false;
-              onAdStateChange?.(false);
-            }
-          }
-          lastVideoTimeRef.current = vid.currentTime;
-          lastAdCheckRef.current = now;
-        }
-      };
+      const onTime = () => { currentTimeRef.current = vid.currentTime; };
       const onCanPlay = () => {
         readyRef.current = true;
         onPlayerReady?.();
@@ -142,26 +111,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         try {
           const msg = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
           if (msg.event === "infoDelivery" && msg.info?.currentTime != null) {
-            const yt = msg.info.currentTime;
-            currentTimeRef.current = yt;
-            onTimeUpdate(yt);
-            // YouTube ad detection
-            const now = Date.now();
-            if (now - lastAdCheckRef.current > 2000) {
-              const dt = yt - lastVideoTimeRef.current;
-              if (dt > 0.3 && dt < 10) {
-                staleTimeCountRef.current = 0;
-                if (isAdRef.current) { isAdRef.current = false; onAdStateChange?.(false); }
-              } else if (dt < 0.1) {
-                staleTimeCountRef.current++;
-                if (staleTimeCountRef.current >= 3 && !isAdRef.current) {
-                  isAdRef.current = true;
-                  onAdStateChange?.(true);
-                }
-              }
-              lastVideoTimeRef.current = yt;
-              lastAdCheckRef.current = now;
-            }
+            currentTimeRef.current = msg.info.currentTime;
+            onTimeUpdate(msg.info.currentTime);
           }
           if (msg.event === "onReady") {
             readyRef.current = true;
@@ -207,26 +158,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === "player:currentTime" && msg.data?.time != null) {
-            const rt = msg.data.time;
-            currentTimeRef.current = rt;
-            onTimeUpdate(rt);
-            // RuTube ad detection
-            const now = Date.now();
-            if (now - lastAdCheckRef.current > 2000) {
-              const dt = rt - lastVideoTimeRef.current;
-              if (dt > 0.3 && dt < 10) {
-                staleTimeCountRef.current = 0;
-                if (isAdRef.current) { isAdRef.current = false; onAdStateChange?.(false); }
-              } else if (dt < 0.1) {
-                staleTimeCountRef.current++;
-                if (staleTimeCountRef.current >= 3 && !isAdRef.current) {
-                  isAdRef.current = true;
-                  onAdStateChange?.(true);
-                }
-              }
-              lastVideoTimeRef.current = rt;
-              lastAdCheckRef.current = now;
-            }
+            currentTimeRef.current = msg.data.time;
+            onTimeUpdate(msg.data.time);
           }
           if (msg.type === "player:ready") {
             readyRef.current = true;
