@@ -538,16 +538,20 @@ export function Room() {
 
   const handlePlayPause = () => {
     if (!canControl || adPlaying) return;
-    const newAction = playerState === "playing" ? "pause" : "play";
+    const isPlaying = playerState === "playing";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitVideoAction(newAction, time);
+    if (isPlaying) {
+      videoPlayerRef.current?.pause();
+      emitVideoAction("pause", time);
+    } else {
+      videoPlayerRef.current?.play();
+      emitVideoAction("play", time);
+    }
     lastSyncEventRef.current = Date.now();
     lastExternalChangeRef.current = Date.now();
     lastUserActionRef.current = Date.now();
     syncFromActionRef.current = true;
     setTimeout(() => { syncFromActionRef.current = false; }, 500);
-    setSyncAction({ action: newAction, time });
-    setTimeout(() => setSyncAction(null), 300);
   };
 
   const handleSeek = (time: number) => {
