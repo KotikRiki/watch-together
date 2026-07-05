@@ -190,7 +190,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     useEffect(() => {
       if (!syncAction) return;
       syncActiveRef.current = true;
-      setTimeout(() => { syncActiveRef.current = false; }, 500);
+      setTimeout(() => { syncActiveRef.current = false; }, 1500);
       if (syncAction.action === "play") {
         currentTimeRef.current = syncAction.time;
         if (isFile && videoRef.current) {

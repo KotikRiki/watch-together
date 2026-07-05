@@ -7,8 +7,8 @@ const logFile = path.join(__dirname, "../../error.log");
 export const logRouter = Router();
 
 logRouter.post("/", (req, res) => {
-  const { level, message, stack, url, userAgent } = req.body;
-  const entry = `[${new Date().toISOString()}] [${level}] ${message}\n${stack ? stack + "\n" : ""}URL: ${url}\nUA: ${userAgent}\n---\n`;
+  const body = req.body;
+  const entry = `[${new Date().toISOString()}] [${body.level || "?"}] ${body.message || "?"}\n${body.extra ? body.extra + "\n" : ""}URL: ${body.url || "?"}\nUA: ${body.ua || body.userAgent || "?"}\n---\n`;
   fs.appendFileSync(logFile, entry);
   res.json({ ok: true });
 });

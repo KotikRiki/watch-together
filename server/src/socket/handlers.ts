@@ -140,7 +140,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.currentTime = time;
       roomState.lastSyncTime = Date.now();
 
-      socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
     });
 
     socket.on("heartbeat", (roomCode: string, time: number, isPlaying: boolean) => {
@@ -216,7 +216,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.currentTime = time;
       roomState.lastSyncTime = Date.now();
 
-      socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
     });
 
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string; replyToId?: string }) => {
