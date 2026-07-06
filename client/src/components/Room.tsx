@@ -964,7 +964,7 @@ export function Room() {
           <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars} onClick={() => { resetLandscapeBars(); }}>
             {/* Top bar — hidden for file videos, only chat */}
             {videoType !== "file" && (
-              <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+              <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/30 via-black/15 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
                 <div className="flex items-center justify-between px-3 py-2">
                   <button onClick={() => navigate("/")} className="text-white/60 text-xs flex items-center gap-1 hover:text-white transition-colors">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -990,7 +990,7 @@ export function Room() {
               </div>
             )}
 
-            {/* File videos: chat button top right only (in portrait, landscape uses its own) */}
+            {/* File videos: chat button top right (in portrait) */}
             {videoType === "file" && !isLandscape && (
               <div className="pointer-events-auto absolute top-3 right-3">
                 <button onClick={() => setChatExpanded(!chatExpanded)} className="relative w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/70 hover:text-white">
@@ -1000,8 +1000,18 @@ export function Room() {
               </div>
             )}
 
+            {/* File videos in landscape: chat button top right */}
+            {videoType === "file" && isLandscape && (
+              <div className={`pointer-events-auto absolute top-2 right-2 z-30 transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+                <button onClick={() => setLandscapeChatOpen(!landscapeChatOpen)} className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all ${landscapeChatOpen ? "bg-blue-500/20 text-blue-400" : "bg-black/40 backdrop-blur text-white/60 hover:text-white"}`}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  {unreadCount > 0 && !landscapeChatOpen && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+                </button>
+              </div>
+            )}
+
             {/* Bottom bar */}
-            <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent transition-opacity duration-500 ${videoType === "file" || landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+            <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/30 via-black/15 to-transparent transition-opacity duration-500 ${videoType === "file" || landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   {videoUrl && (
