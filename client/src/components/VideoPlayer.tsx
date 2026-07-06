@@ -320,7 +320,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             playsInline
-            preload="metadata"
+            preload="none"
             onError={() => onStateChange?.("ended")}
           />
         </div>

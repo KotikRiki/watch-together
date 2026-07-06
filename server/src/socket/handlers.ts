@@ -150,7 +150,7 @@ export function setupSocketHandlers(io: Server) {
 
       roomState.currentTime = time;
       roomState.isPlaying = isPlaying;
-      socket.to(roomCode).emit("heartbeat", { time, isPlaying, userId: socket.id });
+      io.to(roomCode).emit("heartbeat", { time, isPlaying, userId: socket.id });
     });
 
     socket.on("user-time", (roomCode: string, time: number, isPlaying: boolean, username: string) => {

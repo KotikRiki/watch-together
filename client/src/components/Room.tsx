@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
 import { VideoPlayer } from "./VideoPlayer";
+import { VideoCall } from "./VideoCall";
+import { LandscapeChat } from "./LandscapeChat";
 import type { VideoPlayerHandle } from "./VideoPlayer";
 import { Chat } from "./Chat";
 import { StickerPanel } from "./StickerPanel";
@@ -232,13 +234,11 @@ export function Room() {
     });
 
     on("video-sync", (data: { action: string; time: number; userId: string }) => {
-      if (data.userId === socket?.id) return;
       setSyncAction({ action: data.action, time: data.time });
       setTimeout(() => setSyncAction(null), 300);
     });
 
     on("heartbeat", (data: { time: number; isPlaying: boolean; userId: string }) => {
-      if (data.userId === socket?.id) return;
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
       if (sinceExternal < 1500) return;
       // Skip heartbeat correction for 2s after any user action
@@ -537,32 +537,38 @@ export function Room() {
 
   const canControl = !hostOnly || isHost;
 
+  const emitAndApply = useCallback((action: string, time: number, opts?: { apply?: boolean; cooldown?: boolean }) => {
+    if (opts?.apply) {
+      if (action === "play") videoPlayerRef.current?.play();
+      else if (action === "pause") videoPlayerRef.current?.pause();
+      else if (action === "seek") videoPlayerRef.current?.seek(time);
+    }
+    emitVideoAction(action, time);
+    if (opts?.cooldown !== false) {
+      lastSyncEventRef.current = Date.now();
+      lastExternalChangeRef.current = Date.now();
+      lastUserActionRef.current = Date.now();
+      syncFromActionRef.current = true;
+      setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    }
+  }, [emitVideoAction]);
+
   const handlePlayPause = () => {
     if (!canControl) return;
     const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    // Imperative call for local player
-    if (action === "play") videoPlayerRef.current?.play();
-    else videoPlayerRef.current?.pause();
-    // Send to server for other users
-    emitVideoAction(action, time);
-    lastUserActionRef.current = Date.now();
+    emitAndApply(action, time, { apply: true });
   };
 
   const handleSeek = (time: number) => {
     if (!canControl || adPlaying) return;
     const t = Math.max(0, time);
-    videoPlayerRef.current?.seek(t);
-    emitVideoAction("seek", t);
-    lastSyncEventRef.current = Date.now();
+    emitAndApply("seek", t, { apply: true });
   };
 
   const handleSync = () => {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitVideoAction("seek", time);
-    lastSyncEventRef.current = Date.now();
-    syncFromActionRef.current = true;
-    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    emitAndApply("seek", time, { apply: false });
     setSyncAction({ action: "seek", time });
     setTimeout(() => setSyncAction(null), 300);
   };
@@ -577,10 +583,7 @@ export function Room() {
   const handleExternalStateChange = (newState: "playing" | "paused") => {
     if (syncFromActionRef.current) return;
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitVideoAction(newState === "playing" ? "play" : "pause", time);
-    lastSyncEventRef.current = Date.now();
-    lastExternalChangeRef.current = Date.now();
-    lastUserActionRef.current = Date.now();
+    emitAndApply(newState === "playing" ? "play" : "pause", time, { cooldown: true });
   };
 
   const handleUserAction = (action: "play" | "pause" | "seek", time: number) => {
@@ -588,12 +591,7 @@ export function Room() {
     if (isUserActionRef.current) return;
     isUserActionRef.current = true;
     setTimeout(() => { isUserActionRef.current = false; }, 300);
-    emitVideoAction(action, time);
-    lastSyncEventRef.current = Date.now();
-    lastExternalChangeRef.current = Date.now();
-    lastUserActionRef.current = Date.now();
-    syncFromActionRef.current = true;
-    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    emitAndApply(action, time, { cooldown: true });
   };
 
   if (!username) {
@@ -669,7 +667,8 @@ export function Room() {
         </header>
 
       {/* Desktop layout — flex: video (flex-1) + chat sidebar (w-80) */}
-      <div ref={desktopContainerRef} className={`${isMobile ? "hidden" : "flex"} flex-1 gap-0 min-h-0`}>
+      {!isMobile && (
+      <div ref={desktopContainerRef} className="flex flex-1 gap-0 min-h-0">
         {/* Video column — takes all available space */}
         <div className="flex-1 flex flex-col min-w-0 p-3 pr-1.5 gap-2">
           {/* Video player */}
@@ -899,9 +898,11 @@ export function Room() {
           )}
         </div>
       </div>
+      )}
 
       {/* Mobile layout — full-screen video + chat overlay */}
-      <div ref={roomContainerRef} className={`${isMobile ? "fixed inset-0 bg-[#0a0a0f] flex flex-col" : "hidden"} transition-all duration-300 ${isLandscape ? "top-0" : "top-[52px]"}`} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {isMobile && (
+      <div ref={roomContainerRef} className="fixed inset-0 bg-[#0a0a0f] flex flex-col transition-all duration-300" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
 
         {/* SINGLE VideoPlayer — always mounted, never remounts */}
         <div className={`${isLandscape ? "absolute inset-0 z-10" : "relative flex-1 min-h-0 bg-black"}`}>
@@ -1030,55 +1031,22 @@ export function Room() {
 
             {/* Chat panel — slides from right */}
             {landscapeChatOpen && (
-              <div className="pointer-events-auto absolute top-0 right-0 bottom-0 w-80 max-w-[85vw] z-30 flex flex-col bg-[#0f0f18]/95 backdrop-blur-xl border-l border-white/5 animate-[slideInRight_0.2s_ease-out]">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                  <span className="text-white/70 text-sm font-medium">Чат</span>
-                  <button onClick={() => setLandscapeChatOpen(false)} className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0 space-y-2">
-                  {messages.length === 0 && <p className="text-gray-600 text-xs text-center mt-12">Пока нет сообщений</p>}
-                  {messages.map((msg) => (
-                    <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"}`}>
-                      <span className="text-[10px] text-gray-500 mb-0.5 px-1">{msg.author}</span>
-                      {msg.text.startsWith("[sticker]") ? (
-                        <video src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")} className="w-28 h-28 object-contain" autoPlay loop muted playsInline />
-                      ) : (
-                        <div className={`px-3 py-1.5 rounded-2xl max-w-[85%] text-sm ${msg.author === username ? "bg-blue-600 text-white rounded-br-md" : "bg-white/10 text-white rounded-bl-md"}`}>{msg.text}</div>
-                      )}
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-                <div className="flex gap-0.5 px-2 py-1 justify-center flex-wrap border-t border-white/5">
-                  {EMOJI_REACTIONS.map((emoji) => (
-                    <button key={emoji} onClick={() => handleReaction(emoji)} className="text-base p-0.5 active:scale-125 transition-transform select-none">{emoji}</button>
-                  ))}
-                </div>
-                <form onSubmit={(e) => { e.preventDefault(); const target = e.target as HTMLFormElement; const input = target.elements.namedItem("chatInputL") as HTMLInputElement; if (input.value.trim()) { emitChatMessage(username, input.value.trim()); input.value = ""; } }} className="flex gap-2 px-3 pb-3 pt-1">
-                  <input name="chatInputL" type="text" placeholder="Сообщение..." className="flex-1 bg-white/5 text-white rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600" />
-                  <button type="submit" className="bg-blue-600 text-white w-9 h-9 rounded-full flex items-center justify-center shrink-0 hover:bg-blue-500 transition-colors active:scale-90">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-                </form>
-              </div>
+              <LandscapeChat
+                messages={messages}
+                username={username}
+                onSendMessage={(text) => emitChatMessage(username, text)}
+                onReaction={handleReaction}
+                onClose={() => setLandscapeChatOpen(false)}
+              />
             )}
 
             {/* Call widget — bottom left */}
             {showCall && socket && (
-              <div className="pointer-events-auto absolute bottom-14 left-3 z-30 w-72 max-w-[60vw]">
-                <div className="bg-[#0f0f18]/90 backdrop-blur-xl rounded-2xl border border-white/5 overflow-hidden shadow-2xl shadow-black/50">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                    <span className="text-white/60 text-[11px] font-medium">Видеозвонок</span>
-                    <button onClick={() => setShowCall(false)} className="text-white/30 hover:text-white transition-colors">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
-                  <div className="p-2">
-                    <VideoCall socket={socket} roomCode={code || ""} username={username} />
-                  </div>
-                </div>
+              <div className="pointer-events-auto absolute bottom-14 left-3 z-30 w-64 max-w-[60vw]">
+                <VideoCall socket={socket} roomCode={code || ""} username={username} compact />
+                <button onClick={() => setShowCall(false)} className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[#0f0f18] border border-white/10 text-white/30 hover:text-white flex items-center justify-center transition-colors">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
             )}
 
@@ -1371,6 +1339,7 @@ export function Room() {
           </>
         )}
       </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {
@@ -1408,205 +1377,4 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// VideoCall component inline to avoid import issues
-function VideoCall({ socket, roomCode, username }: { socket: any; roomCode: string; username: string }) {
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const [callState, setCallState] = useState<"idle" | "calling" | "ringing" | "connected">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [micEnabled, setMicEnabled] = useState(true);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
-  const servers = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:stun2.l.google.com:19302" },
-    ],
-  };
-
-  const cleanup = useCallback(() => {
-    pcRef.current?.close();
-    pcRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCallState("idle");
-    setErrorMsg("");
-    setVideoEnabled(true);
-    setMicEnabled(true);
-  }, []);
-
-  const getMedia = async (video = true): Promise<MediaStream | null> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
-      streamRef.current = stream;
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-      setVideoEnabled(video);
-      setMicEnabled(true);
-      return stream;
-    } catch {
-      setErrorMsg("Разрешите камеру и микрофон в настройках браузера");
-      return null;
-    }
-  };
-
-  const startCall = async (withVideo = true) => {
-    setCallState("calling");
-    setErrorMsg(withVideo ? "Запрашиваю камеру..." : "Запрашиваю микрофон...");
-    const stream = await getMedia(withVideo);
-    if (!stream) { setCallState("idle"); return; }
-
-    const pc = new RTCPeerConnection(servers);
-    pcRef.current = pc;
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-    pc.onicecandidate = (e) => e.candidate && socket.emit("ice-candidate", roomCode, e.candidate);
-    pc.ontrack = (e) => {
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
-      setCallState("connected");
-      setErrorMsg("");
-    };
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      if (state === "failed" || state === "disconnected") {
-        setErrorMsg("Соединение потеряно");
-        cleanup();
-      }
-    };
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit("call-user", roomCode, offer, username);
-    setCallState("calling");
-    setErrorMsg("Ожидание ответа...");
-  };
-
-  const toggleVideo = () => {
-    if (!streamRef.current) return;
-    const videoTrack = streamRef.current.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setVideoEnabled(videoTrack.enabled);
-    }
-  };
-
-  const toggleMic = () => {
-    if (!streamRef.current) return;
-    const audioTrack = streamRef.current.getAudioTracks()[0];
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      setMicEnabled(audioTrack.enabled);
-    }
-  };
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleCallMade = async (offer: RTCSessionDescriptionInit) => {
-      setCallState("ringing");
-      setErrorMsg("Входящий звонок...");
-      const stream = await getMedia(videoEnabled);
-      if (!stream) { setCallState("idle"); return; }
-
-      const pc = new RTCPeerConnection(servers);
-      pcRef.current = pc;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-      pc.onicecandidate = (e) => e.candidate && socket.emit("ice-candidate", roomCode, e.candidate);
-      pc.ontrack = (e) => {
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = e.streams[0];
-        setCallState("connected");
-        setErrorMsg("");
-      };
-      pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        if (state === "failed" || state === "disconnected") {
-          setErrorMsg("Соединение потеряно");
-          cleanup();
-        }
-      };
-      await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit("make-answer", roomCode, answer);
-      setCallState("connected");
-    };
-
-    const handleAnswerMade = async (answer: RTCSessionDescriptionInit) => {
-      if (pcRef.current) {
-        await pcRef.current.setRemoteDescription(answer);
-        setCallState("connected");
-        setErrorMsg("");
-      }
-    };
-
-    const handleIceCandidate = async (c: RTCIceCandidateInit) => {
-      try { await pcRef.current?.addIceCandidate(c); } catch {}
-    };
-
-    socket.on("call-made", handleCallMade);
-    socket.on("answer-made", handleAnswerMade);
-    socket.on("ice-candidate", handleIceCandidate);
-    socket.on("call-ended", () => { setErrorMsg("Звонок завершён"); cleanup(); });
-
-    return () => {
-      socket.off("call-made", handleCallMade);
-      socket.off("answer-made", handleAnswerMade);
-      socket.off("ice-candidate", handleIceCandidate);
-      socket.off("call-ended");
-    };
-  }, [socket, roomCode]);
-
-  useEffect(() => cleanup, []);
-
-  const stateLabel = callState === "calling" ? "Вызывает..." : callState === "ringing" ? "Звонит..." : callState === "connected" ? "Подключено" : "";
-  const stateColor = callState === "connected" ? "text-green-400" : "text-yellow-400";
-
-  return (
-    <div className="bg-gray-900 rounded-lg p-3">
-      <h3 className="text-white font-semibold mb-2 text-sm">{videoEnabled ? "Видеозвонок" : "Аудиозвонок"}</h3>
-      {videoEnabled ? (
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden relative">
-            <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-            <span className="absolute bottom-1 left-1 text-xs text-gray-400 bg-black/50 px-1 rounded">Вы</span>
-          </div>
-          <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden relative">
-            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-            <span className="absolute bottom-1 left-1 text-xs text-gray-400 bg-black/50 px-1 rounded">Собеседник</span>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-center gap-4 mb-3 py-4">
-          <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-2xl">🎤</div>
-          <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-2xl">🔊</div>
-        </div>
-      )}
-      {errorMsg && <p className="text-yellow-400 text-xs mb-2">{errorMsg}</p>}
-      {stateLabel && <p className={`text-xs mb-2 ${stateColor}`}>{stateLabel}</p>}
-
-      {callState === "idle" ? (
-        <div className="flex gap-2">
-          <button onClick={() => startCall(true)} className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold active:bg-green-700">
-            📹 Видеозвонок
-          </button>
-          <button onClick={() => startCall(false)} className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold active:bg-blue-700">
-            🎤 Аудиозвонок
-          </button>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <button onClick={toggleVideo} className={`flex-1 py-2 rounded-lg text-sm font-semibold ${videoEnabled ? "bg-gray-700 text-white" : "bg-red-600 text-white"}`}>
-            {videoEnabled ? "📹 Видео" : "📹 Без видео"}
-          </button>
-          <button onClick={toggleMic} className={`flex-1 py-2 rounded-lg text-sm font-semibold ${micEnabled ? "bg-gray-700 text-white" : "bg-red-600 text-white"}`}>
-            {micEnabled ? "🎤 Микр." : "🎤 Мute"}
-          </button>
-          <button onClick={() => { cleanup(); socket.emit("end-call", roomCode); }} className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold active:bg-red-700">
-            ✖
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
