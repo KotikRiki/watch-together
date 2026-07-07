@@ -962,6 +962,10 @@ export function Room() {
         {/* ============ LANDSCAPE OVERLAYS ============ */}
         {isLandscape && (
           <div className="absolute inset-0 z-20 pointer-events-none" onTouchStart={resetLandscapeBars} onClick={() => { resetLandscapeBars(); }}>
+            {/* Persistent exit button — always visible in landscape */}
+            <button onClick={(e) => { e.stopPropagation(); setShowRotateHint(true); if (rotateHintTimerRef.current) clearTimeout(rotateHintTimerRef.current); rotateHintTimerRef.current = setTimeout(() => setShowRotateHint(false), 5000); }} className="pointer-events-auto absolute top-2 left-2 z-40 w-7 h-7 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white/50 hover:text-white transition-all opacity-60 hover:opacity-100">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            </button>
             {/* Top bar — hidden for file videos, only chat */}
             {videoType !== "file" && (
               <div className={`pointer-events-auto absolute top-0 left-0 right-0 bg-gradient-to-b from-black/30 via-black/15 to-transparent transition-opacity duration-500 ${landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
@@ -1180,8 +1184,8 @@ export function Room() {
                 <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
                 <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
               </div>
-              <span className="text-white/80 text-sm font-medium">Переверни телефон</span>
-              <span className="text-white/40 text-xs">для полноэкранного просмотра</span>
+              <span className="text-white/80 text-sm font-medium">{isLandscape ? "Поверни телефон вертикально" : "Переверни телефон"}</span>
+              <span className="text-white/40 text-xs">{isLandscape ? "чтобы выйти из полноэкранного режима" : "для полноэкранного просмотра"}</span>
             </div>
           </div>
         )}
