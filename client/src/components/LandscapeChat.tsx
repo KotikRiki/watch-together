@@ -20,7 +20,7 @@ export function LandscapeChat({ messages, username, onSendMessage, onReaction, o
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="pointer-events-auto absolute top-0 right-0 bottom-0 w-1/2 min-w-[280px] max-w-[85vw] z-30 flex flex-col bg-[#0f0f18]/95 backdrop-blur-xl border-l border-white/5 animate-[slideInRight_0.2s_ease-out]">
+    <div className="pointer-events-auto absolute top-0 right-0 bottom-0 w-1/2 min-w-[280px] max-w-[85vw] z-30 flex flex-col bg-[#0f0f18]/30 backdrop-blur-xl border-l border-white/5 animate-[slideInRight_0.2s_ease-out]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <span className="text-white/70 text-sm font-medium">Чат</span>
         <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors">
