@@ -1030,7 +1030,7 @@ export function Room() {
             )}
 
             {/* Bottom bar */}
-            <div className={`pointer-events-auto absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/30 via-black/15 to-transparent transition-opacity duration-500 ${videoType === "file" || landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
+            <div onClick={(e) => e.stopPropagation()} className={`pointer-events-auto absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/30 via-black/15 to-transparent transition-opacity duration-500 ${videoType === "file" || landscapeBarsVisible ? "opacity-100" : "opacity-0"}`}>
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   {videoUrl && (

@@ -321,6 +321,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             className="absolute inset-0 w-full h-full object-contain"
             playsInline
             preload="metadata"
+            onClick={(e) => e.stopPropagation()}
             onError={() => onStateChange?.("ended")}
           />
         </div>
