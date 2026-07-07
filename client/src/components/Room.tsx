@@ -1112,20 +1112,28 @@ export function Room() {
                   <button onClick={() => handleSeek((videoPlayerRef.current?.getCurrentTime() || 0) + 10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                   </button>
-                  <button onClick={handleSync} disabled={!playerReady || adPlaying} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 disabled:opacity-30 hover:text-white transition-all">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                  </button>
+                  {videoType !== "file" && (
+                    <button onClick={handleSync} disabled={!playerReady || adPlaying} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 disabled:opacity-30 hover:text-white transition-all">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                  )}
                   <span className="text-white/50 text-[11px] font-mono ml-auto">{formatTime(videoPlayerRef.current?.getCurrentTime() || 0)}</span>
-                  <label className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 cursor-pointer hover:text-white transition-all">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <input type="file" accept=".mp4,.webm,.mkv,.avi,.mov,.ogg,.ogv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f); }} />
-                  </label>
-                  <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                  </button>
-                  <button onClick={() => { const newAd = !adPlaying; setAdPlaying(newAd); manualAdRef.current = true; if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current); manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000); const time = videoPlayerRef.current?.getCurrentTime() || 0; const action = newAd ? "pause" : "play"; emitVideoSync(action, time); if (newAd) socket?.emit("ad-started", code); else socket?.emit("ad-ended", code); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
-                  </button>
+                  {videoType !== "file" && (
+                    <label className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 cursor-pointer hover:text-white transition-all">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <input type="file" accept=".mp4,.webm,.mkv,.avi,.mov,.ogg,.ogv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadFile(f); }} />
+                    </label>
+                  )}
+                  {videoType !== "file" && (
+                    <button onClick={() => setShowCall(!showCall)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${showCall ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    </button>
+                  )}
+                  {videoType !== "file" && (
+                    <button onClick={() => { const newAd = !adPlaying; setAdPlaying(newAd); manualAdRef.current = true; if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current); manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000); const time = videoPlayerRef.current?.getCurrentTime() || 0; const action = newAd ? "pause" : "play"; emitVideoSync(action, time); if (newAd) socket?.emit("ad-started", code); else socket?.emit("ad-ended", code); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${adPlaying ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white/60 hover:text-white"}`}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+                    </button>
+                  )}
                   <button onClick={toggleFullscreen} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
                   </button>
