@@ -11,6 +11,7 @@ import { adminRouter } from "./routes/admin";
 import { stickersRouter } from "./routes/stickers";
 import { downloadRouter } from "./routes/download";
 import { logRouter } from "./routes/log";
+import { loggerRouter } from "./routes/logger";
 import { setupSocketHandlers } from "./socket/handlers";
 import { initDB } from "./db/postgres";
 
@@ -36,6 +37,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/stickers", stickersRouter);
 app.use("/api/download", downloadRouter);
 app.use("/api/log", logRouter);
+app.use("/api/logger", loggerRouter);
 setupUploadServing(app);
 
 app.get("/reset-pwa", (_req, res) => {

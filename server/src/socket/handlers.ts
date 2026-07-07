@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { query, generateId } from "../db/postgres";
+import { logEvent } from "../db/logger";
 
 interface RoomState {
   videoUrl: string | null;
@@ -14,6 +15,7 @@ interface RoomState {
   lastSyncTime: number;
   userTimes: Map<string, { time: number; isPlaying: boolean; username: string }>;
   watchAccumulator: Map<string, number>;
+  voiceUsers: Set<string>;
 }
 
 const rooms = new Map<string, RoomState>();
@@ -66,6 +68,7 @@ export function setupSocketHandlers(io: Server) {
           lastSyncTime: 0,
           userTimes: new Map(),
           watchAccumulator: new Map(),
+          voiceUsers: new Set(),
         });
       }
 
@@ -95,6 +98,8 @@ export function setupSocketHandlers(io: Server) {
       });
 
       io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
+
+      logEvent(roomCode, username, socket.id, "join-room", { userCount: roomState.users.size }, socket.handshake.address);
     });
 
     socket.on("change-video", async (roomCode: string, videoUrl: string, videoType: string) => {
@@ -141,6 +146,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.lastSyncTime = Date.now();
 
       io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+      logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "video-action", { action, time });
     });
 
     socket.on("heartbeat", (roomCode: string, time: number, isPlaying: boolean) => {
@@ -252,6 +258,8 @@ export function setupSocketHandlers(io: Server) {
         replyToId: message.replyToId || null,
         createdAt: new Date().toISOString(),
       });
+
+      logEvent(roomCode, message.author, socket.id, "chat-message", { text: message.text.substring(0, 100) });
     });
 
     socket.on("emoji-reaction", (roomCode: string, emoji: string) => {
@@ -320,6 +328,55 @@ export function setupSocketHandlers(io: Server) {
       io.to(roomCode).emit("queue-updated", { action: "next", removedItem: { id: next.id, url: next.url, title: next.title } });
     });
 
+    // ============ VOICE CHAT ============
+
+    socket.on("voice-join", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+
+      roomState.voiceUsers.add(socket.id);
+
+      // Send existing voice users to the new joiner
+      const existingUsers: { socketId: string; username: string }[] = [];
+      roomState.voiceUsers.forEach((sid) => {
+        if (sid !== socket.id) {
+          existingUsers.push({ socketId: sid, username: roomState.usernames.get(sid) || "unknown" });
+        }
+      });
+      socket.emit("voice-users", existingUsers);
+
+      // Notify others
+      socket.to(roomCode).emit("voice-user-joined", socket.id, roomState.usernames.get(socket.id) || "unknown");
+
+      logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "voice-join", { voiceUsers: roomState.voiceUsers.size });
+    });
+
+    socket.on("voice-leave", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+
+      roomState.voiceUsers.delete(socket.id);
+      socket.to(roomCode).emit("voice-user-left", socket.id);
+
+      logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "voice-leave", { voiceUsers: roomState.voiceUsers.size });
+    });
+
+    socket.on("voice-offer", (roomCode: string, targetSocketId: string, offer: any) => {
+      io.to(targetSocketId).emit("voice-offer", socket.id, offer, rooms.get(roomCode)?.usernames.get(socket.id) || "unknown");
+    });
+
+    socket.on("voice-answer", (roomCode: string, targetSocketId: string, answer: any) => {
+      io.to(targetSocketId).emit("voice-answer", socket.id, answer);
+    });
+
+    socket.on("voice-ice", (roomCode: string, targetSocketId: string, candidate: any) => {
+      io.to(targetSocketId).emit("voice-ice", socket.id, candidate);
+    });
+
+    socket.on("voice-speaking", (roomCode: string, speaking: boolean) => {
+      socket.to(roomCode).emit("voice-speaking", socket.id, speaking);
+    });
+
     socket.on("disconnect", async () => {
       console.log("User disconnected:", socket.id);
       for (const [roomCode, roomState] of rooms) {
@@ -328,6 +385,14 @@ export function setupSocketHandlers(io: Server) {
           roomState.users.delete(socket.id);
           roomState.usernames.delete(socket.id);
           roomState.userTimes.delete(socket.id);
+
+          // Voice chat cleanup
+          if (roomState.voiceUsers.has(socket.id)) {
+            roomState.voiceUsers.delete(socket.id);
+            io.to(roomCode).emit("voice-user-left", socket.id);
+          }
+
+          logEvent(roomCode, username, socket.id, "disconnect", { remaining: roomState.users.size });
 
           await flushWatchTime(roomCode);
 

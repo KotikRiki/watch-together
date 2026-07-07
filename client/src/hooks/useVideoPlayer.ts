@@ -1,0 +1,328 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { Socket } from "socket.io-client";
+import type { VideoPlayerHandle } from "../components/VideoPlayer";
+
+interface Message {
+  id: string;
+  author: string;
+  text: string;
+  replyToId?: string | null;
+  createdAt: string;
+}
+
+interface QueueItem {
+  id: string;
+  url: string;
+  title: string | null;
+  order: number;
+}
+
+interface UseVideoPlayerOptions {
+  socket: Socket | null;
+  roomCode: string;
+  username: string;
+  isLandscape: boolean;
+  emitVideoAction: (action: string, time: number) => void;
+  emitVideoSync: (action: string, time: number) => void;
+  emitPlayNext: () => void;
+  on: (event: string, callback: (...args: any[]) => void) => void;
+  off: (event: string, callback?: (...args: any[]) => void) => void;
+}
+
+export function useVideoPlayer({
+  socket,
+  roomCode,
+  username,
+  isLandscape,
+  emitVideoAction,
+  emitVideoSync,
+  emitPlayNext,
+  on,
+  off,
+}: UseVideoPlayerOptions) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoType, setVideoType] = useState<"embed" | "file">("embed");
+  const [playerState, setPlayerState] = useState<"playing" | "paused" | "ended">("paused");
+  const [playerReady, setPlayerReady] = useState(false);
+  const [syncAction, setSyncAction] = useState<{ action: string; time: number } | null>(null);
+  const [adPlaying, setAdPlaying] = useState(false);
+  const [peerTimes, setPeerTimes] = useState<{ time: number; isPlaying: boolean; username: string }[]>([]);
+  const [watchTimes, setWatchTimes] = useState<{ username: string; seconds: number }[]>([]);
+  const [isHost, setIsHost] = useState(false);
+  const [hostOnly, setHostOnly] = useState(false);
+
+  const videoPlayerRef = useRef<VideoPlayerHandle>(null);
+  const playerStateRef = useRef<"playing" | "paused" | "ended">("paused");
+  const adPlayingRef = useRef(false);
+  const pendingStateRef = useRef<{ currentTime: number; isPlaying: boolean } | null>(null);
+  const lastUserActionRef = useRef(0);
+  const isUserActionRef = useRef(false);
+  const lastExternalChangeRef = useRef(0);
+  const lastSyncEventRef = useRef(0);
+  const syncFromActionRef = useRef(false);
+  const manualAdRef = useRef(false);
+  const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatSyncingRef = useRef(false);
+
+  useEffect(() => {
+    playerStateRef.current = playerState;
+  }, [playerState]);
+
+  useEffect(() => {
+    adPlayingRef.current = adPlaying;
+  }, [adPlaying]);
+
+  // Socket events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleRoomState = (data: { videoUrl: string | null; videoType?: string; isHost?: boolean; hostOnly?: boolean; currentTime?: number; isPlaying?: boolean }) => {
+      if (data.videoUrl) setVideoUrl(data.videoUrl);
+      if (data.videoType) setVideoType(data.videoType as "embed" | "file");
+      if (data.isHost) setIsHost(true);
+      if (data.hostOnly !== undefined) setHostOnly(data.hostOnly);
+      if (data.videoUrl && data.currentTime != null && data.currentTime > 0) {
+        pendingStateRef.current = { currentTime: data.currentTime, isPlaying: !!data.isPlaying };
+      }
+    };
+
+    const handleVideoChanged = (data: { videoUrl: string; videoType?: string }) => {
+      setVideoUrl(data.videoUrl);
+      if (data.videoType) setVideoType(data.videoType as "embed" | "file");
+    };
+
+    const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
+      setSyncAction({ action: data.action, time: data.time });
+      setTimeout(() => setSyncAction(null), 300);
+    };
+
+    const handleHeartbeat = (data: { time: number; isPlaying: boolean; userId: string }) => {
+      const sinceExternal = Date.now() - lastExternalChangeRef.current;
+      if (sinceExternal < 1500) return;
+      const sinceUserAction = Date.now() - lastUserActionRef.current;
+      if (sinceUserAction < 2000) return;
+
+      heartbeatSyncingRef.current = true;
+      setTimeout(() => { heartbeatSyncingRef.current = false; }, 500);
+
+      if (videoType === "file") {
+        videoPlayerRef.current?.smoothCorrect(data.time, data.isPlaying);
+      } else {
+        const localTime = videoPlayerRef.current?.getCurrentTime() || 0;
+        const drift = Math.abs(data.time - localTime);
+        if (drift > 2) {
+          videoPlayerRef.current?.seek(data.time);
+        }
+        if (sinceExternal > 3000) {
+          if (data.isPlaying && playerStateRef.current !== "playing") {
+            videoPlayerRef.current?.play();
+          } else if (!data.isPlaying && playerStateRef.current !== "paused") {
+            videoPlayerRef.current?.pause();
+          }
+        }
+      }
+    };
+
+    const handleUserTimes = (data: { users: { time: number; isPlaying: boolean; username: string }[] }) => {
+      setPeerTimes(data.users);
+    };
+
+    const handleHostChanged = (data: { isHost: boolean }) => {
+      setIsHost(data.isHost);
+    };
+
+    const handleHostOnlyChanged = (data: { hostOnly: boolean }) => {
+      setHostOnly(data.hostOnly);
+    };
+
+    const handleAdStateChanged = (data: { isAd: boolean }) => {
+      setAdPlaying(data.isAd);
+    };
+
+    const handleWatchTimeUpdate = (data: { watchTimes: { username: string; seconds: number }[] }) => {
+      setWatchTimes(data.watchTimes);
+    };
+
+    on("room-state", handleRoomState);
+    on("video-changed", handleVideoChanged);
+    on("video-sync", handleVideoSync);
+    on("heartbeat", handleHeartbeat);
+    on("user-times", handleUserTimes);
+    on("host-changed", handleHostChanged);
+    on("host-only-changed", handleHostOnlyChanged);
+    on("ad-state-changed", handleAdStateChanged);
+    on("watch-time-update", handleWatchTimeUpdate);
+
+    return () => {
+      off("room-state", handleRoomState);
+      off("video-changed", handleVideoChanged);
+      off("video-sync", handleVideoSync);
+      off("heartbeat", handleHeartbeat);
+      off("user-times", handleUserTimes);
+      off("host-changed", handleHostChanged);
+      off("host-only-changed", handleHostOnlyChanged);
+      off("ad-state-changed", handleAdStateChanged);
+      off("watch-time-update", handleWatchTimeUpdate);
+      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+    };
+  }, [socket, videoType]);
+
+  // Auto-play next from queue when video ends (host only)
+  useEffect(() => {
+    if (playerState === "ended" && isHost) {
+      const timer = setTimeout(() => {
+        emitPlayNext();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [playerState, isHost, emitPlayNext]);
+
+  // Apply pending room state when player becomes ready
+  useEffect(() => {
+    if (!playerReady) return;
+    const pending = pendingStateRef.current;
+    if (!pending) return;
+    const sinceUserAction = Date.now() - lastUserActionRef.current;
+    if (sinceUserAction < 2000) { pendingStateRef.current = null; return; }
+    pendingStateRef.current = null;
+    videoPlayerRef.current?.seek(pending.currentTime);
+    if (pending.isPlaying) {
+      setTimeout(() => videoPlayerRef.current?.play(), 200);
+    }
+  }, [playerReady]);
+
+  // Heartbeat
+  useEffect(() => {
+    if (!socket || !playerReady) return;
+    const interval = isLandscape ? 5000 : 3000;
+    let tick = 0;
+    heartbeatIntervalRef.current = setInterval(() => {
+      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+      if (!adPlayingRef.current) {
+        socket.emit("heartbeat", roomCode, time, playerStateRef.current === "playing");
+      }
+      socket.emit("user-time", roomCode, time, playerStateRef.current === "playing", username);
+      tick++;
+      if (tick % 3 === 0) {
+        socket.emit("get-watch-time", roomCode);
+      }
+    }, interval);
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+    };
+  }, [socket, roomCode, playerReady, username, isLandscape]);
+
+  const canControl = !hostOnly || isHost;
+
+  const emitAndApply = useCallback((action: string, time: number, opts?: { apply?: boolean; cooldown?: boolean }) => {
+    if (opts?.apply) {
+      if (action === "play") videoPlayerRef.current?.play();
+      else if (action === "pause") videoPlayerRef.current?.pause();
+      else if (action === "seek") videoPlayerRef.current?.seek(time);
+    }
+    emitVideoAction(action, time);
+    if (opts?.cooldown !== false) {
+      lastSyncEventRef.current = Date.now();
+      lastExternalChangeRef.current = Date.now();
+      lastUserActionRef.current = Date.now();
+      syncFromActionRef.current = true;
+      setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    }
+  }, [emitVideoAction]);
+
+  const handlePlayPause = useCallback(() => {
+    if (!canControl) return;
+    const action = playerState === "playing" ? "pause" : "play";
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    emitAndApply(action, time, { apply: true });
+  }, [canControl, playerState, emitAndApply]);
+
+  const handleSeek = useCallback((time: number) => {
+    if (!canControl || adPlaying) return;
+    const t = Math.max(0, time);
+    emitAndApply("seek", t, { apply: true });
+  }, [canControl, adPlaying, emitAndApply]);
+
+  const handleSync = useCallback(() => {
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    emitAndApply("seek", time, { apply: false });
+    setSyncAction({ action: "seek", time });
+    setTimeout(() => setSyncAction(null), 300);
+  }, [emitAndApply]);
+
+  const toggleHostOnly = useCallback(() => {
+    if (!isHost) return;
+    const newVal = !hostOnly;
+    setHostOnly(newVal);
+    socket?.emit("set-host-only", roomCode, newVal);
+  }, [isHost, hostOnly, socket, roomCode]);
+
+  const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
+    if (syncFromActionRef.current) return;
+    if (heartbeatSyncingRef.current) return;
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    emitAndApply(newState === "playing" ? "play" : "pause", time, { cooldown: true });
+  }, [emitAndApply]);
+
+  const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
+    if (!canControl || adPlaying) return;
+    if (isUserActionRef.current) return;
+    if (heartbeatSyncingRef.current) return;
+    isUserActionRef.current = true;
+    setTimeout(() => { isUserActionRef.current = false; }, 300);
+    emitAndApply(action, time, { cooldown: true });
+  }, [canControl, adPlaying, emitAndApply]);
+
+  const handleAdStateChange = useCallback((isAd: boolean) => {
+    if (manualAdRef.current) return;
+    setAdPlaying(isAd);
+    if (isAd) socket?.emit("ad-started", roomCode);
+    else socket?.emit("ad-ended", roomCode);
+  }, [socket, roomCode]);
+
+  const toggleManualAd = useCallback(() => {
+    const newAd = !adPlaying;
+    setAdPlaying(newAd);
+    manualAdRef.current = true;
+    if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+    manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    const action = newAd ? "pause" : "play";
+    emitVideoSync(action, time);
+    if (newAd) socket?.emit("ad-started", roomCode);
+    else socket?.emit("ad-ended", roomCode);
+  }, [adPlaying, emitVideoSync, socket, roomCode]);
+
+  return {
+    videoUrl,
+    videoType,
+    playerState,
+    playerReady,
+    syncAction,
+    adPlaying,
+    peerTimes,
+    watchTimes,
+    isHost,
+    hostOnly,
+    canControl,
+    videoPlayerRef,
+    setVideoUrl,
+    setVideoType,
+    setPlayerState,
+    setPlayerReady,
+    setAdPlaying,
+    setHostOnly,
+    emitAndApply,
+    handlePlayPause,
+    handleSeek,
+    handleSync,
+    toggleHostOnly,
+    handleExternalStateChange,
+    handleUserAction,
+    handleAdStateChange,
+    toggleManualAd,
+  };
+}

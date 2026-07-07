@@ -67,3 +67,9 @@ body {
   from { transform: translate(-50%, 100%); opacity: 0; }
   to { transform: translate(-50%, 0); opacity: 1; }
 }
+
+@keyframes fadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes phoneRotate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+@keyframes float-up { 0% { opacity:1; transform:translateY(0) scale(1); } 100% { opacity:0; transform:translateY(-100px) scale(1.5); } }
+@keyframes floatMsg { 0% { opacity: 0; transform: translateY(10px); } 15% { opacity: 1; transform: translateY(0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }

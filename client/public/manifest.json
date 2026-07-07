@@ -1,0 +1,17 @@
+{
+  "name": "Watch Together",
+  "short_name": "WatchTogether",
+  "description": "Смотрите видео вместе с друзьями в реальном времени",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#1e293b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

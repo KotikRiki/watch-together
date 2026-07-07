@@ -11,4 +11,5 @@ deploy.zip
 data.json
 uploads/
 .env
+server/.env
 *.mp4
