@@ -117,22 +117,20 @@ export function Room() {
   const toggleFullscreen = async () => {
     if (isMobile) {
       if (isLandscape) {
-        // Try to exit fullscreen
+        // Exit: try Fullscreen API, then force Safari address bar back
         try { await document.exitFullscreen(); } catch {}
-        // Force Safari to show address bar
         window.scrollTo(0, 1);
         setTimeout(() => window.scrollTo(0, 0), 200);
         return;
       }
-      // Portrait — try Fullscreen API on document.documentElement (works on iOS Safari)
+      // Portrait — try Fullscreen API first
       try {
         await document.documentElement.requestFullscreen();
         return;
       } catch {}
-      // Fallback: show rotate hint
-      setShowRotateHint(true);
-      if (rotateHintTimerRef.current) clearTimeout(rotateHintTimerRef.current);
-      rotateHintTimerRef.current = setTimeout(() => setShowRotateHint(false), 5000);
+      // Fallback: scroll down to trigger Safari address bar auto-hide
+      window.scrollTo(0, 1);
+      setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 150);
       return;
     }
     // Desktop — native fullscreen
@@ -1195,34 +1193,17 @@ export function Room() {
         {/* Rotate phone hint */}
         {showRotateHint && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]" onClick={() => setShowRotateHint(false)}>
-            <div className="flex flex-col items-center gap-4 max-w-[280px] px-6">
-              {isLandscape ? (
-                <>
-                  <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative rotate-90" style={{ animation: "phoneRotate 2s ease-in-out infinite" }}>
-                    <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
-                  </div>
-                  <span className="text-white/90 text-sm font-semibold">Как выйти из полноэкранного режима?</span>
-                  <div className="text-white/50 text-xs leading-relaxed text-center space-y-2">
-                    <p>Поверните телефон <b className="text-white/70">вертикально</b></p>
-                    <p>или нажмите кнопку <b className="text-white/70">↩</b> в левом верхнем углу</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative" style={{ transformOrigin: "center center", animation: "phoneRotate 2s ease-in-out infinite" }}>
-                    <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
-                  </div>
-                  <span className="text-white/90 text-sm font-semibold">Как включить полноэкранный режим?</span>
-                  <div className="text-white/50 text-xs leading-relaxed text-center space-y-2">
-                    <p>1. Поверните телефон <b className="text-white/70">горизонтально</b></p>
-                    <p>2. В Safari нажмите <b className="text-white/70">иконку «АА»</b> в адресной строке</p>
-                    <p>3. Выберите <b className="text-white/70">«Скрыть строку состояния»</b></p>
-                  </div>
-                </>
-              )}
-              <span className="text-white/30 text-[10px] mt-2">Нажмите чтобы закрыть</span>
+            <div className="flex flex-col items-center gap-3 max-w-[280px] px-6">
+              <div className="w-16 h-28 border-2 border-white/40 rounded-xl relative rotate-90" style={{ animation: "phoneRotate 2s ease-in-out infinite" }}>
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
+              </div>
+              <span className="text-white/90 text-sm font-semibold">Как выйти?</span>
+              <div className="text-white/50 text-xs leading-relaxed text-center space-y-1">
+                <p>Поверните телефон <b className="text-white/70">вертикально</b></p>
+                <p>или нажмите <b className="text-white/70">↩</b> вверху слева</p>
+              </div>
+              <span className="text-white/30 text-[10px]">Нажмите чтобы закрыть</span>
             </div>
           </div>
         )}
