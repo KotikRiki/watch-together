@@ -124,17 +124,15 @@ export function Room() {
         setTimeout(() => window.scrollTo(0, 0), 200);
         return;
       }
-      // Portrait — try Fullscreen API, fallback to rotate hint
-      const container = roomContainerRef.current;
-      if (container) {
-        try {
-          await container.requestFullscreen();
-          return;
-        } catch {}
-      }
+      // Portrait — try Fullscreen API on document.documentElement (works on iOS Safari)
+      try {
+        await document.documentElement.requestFullscreen();
+        return;
+      } catch {}
+      // Fallback: show rotate hint
       setShowRotateHint(true);
       if (rotateHintTimerRef.current) clearTimeout(rotateHintTimerRef.current);
-      rotateHintTimerRef.current = setTimeout(() => setShowRotateHint(false), 3000);
+      rotateHintTimerRef.current = setTimeout(() => setShowRotateHint(false), 5000);
       return;
     }
     // Desktop — native fullscreen
