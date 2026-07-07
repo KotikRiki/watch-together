@@ -114,6 +114,16 @@ export function Room() {
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
+  // Auto-hide Safari address bar when entering landscape on mobile
+  useEffect(() => {
+    if (isMobile && isLandscape) {
+      setTimeout(() => {
+        window.scrollTo(0, 1);
+        setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 200);
+      }, 300);
+    }
+  }, [isMobile, isLandscape]);
+
   const toggleFullscreen = async () => {
     if (isMobile) {
       if (isLandscape) {
@@ -1199,7 +1209,7 @@ export function Room() {
                 <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/30 rounded-full" />
                 <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white/30 rounded-full" />
               </div>
-              <span className="text-white/90 text-sm font-semibold">Поверните телефон горизонтально</span>
+              <span className="text-white/90 text-sm font-semibold text-center">Поверните телефон горизонтально</span>
               <span className="text-white/50 text-xs leading-relaxed text-center">Адресная строка скроется автоматически</span>
               <span className="text-white/30 text-[10px]">Нажмите чтобы закрыть</span>
             </div>
