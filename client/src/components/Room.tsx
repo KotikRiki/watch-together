@@ -345,8 +345,9 @@ export function Room() {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
-  // Keyboard hotkeys
+  // Keyboard hotkeys (desktop only)
   useEffect(() => {
+    if (isMobile) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       switch (e.code) {
@@ -374,7 +375,7 @@ export function Room() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [videoPlayer.handlePlayPause, videoPlayer.handleSeek, videoPlayer.videoPlayerRef, toggleFullscreen, toggleMute]);
+  }, [isMobile, videoPlayer.handlePlayPause, videoPlayer.handleSeek, videoPlayer.videoPlayerRef, toggleFullscreen, toggleMute]);
 
   const handleLogin = (name: string) => {
     localStorage.setItem("wt_username", name);

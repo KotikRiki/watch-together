@@ -78,8 +78,15 @@ export function useVideoPlayer({
     };
 
     const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
-      setSyncAction({ action: data.action, time: data.time });
-      setTimeout(() => setSyncAction(null), 300);
+      // Apply sync directly without state update for faster response
+      if (data.action === "play") {
+        videoPlayerRef.current?.play();
+      } else if (data.action === "pause") {
+        videoPlayerRef.current?.pause();
+      } else if (data.action === "seek") {
+        videoPlayerRef.current?.seek(data.time);
+      }
+      lastExternalChangeRef.current = Date.now();
     };
 
     const handleHeartbeat = (data: { time: number; isPlaying: boolean; userId: string }) => {
