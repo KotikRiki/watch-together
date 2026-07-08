@@ -14,7 +14,7 @@ function getPool(): pg.Pool {
       ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
       connectionTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
-      max: 5,
+      max: 20,
     });
     pool.on("error", (err) => {
       console.error("Pool error (will reset on next request):", err.message);

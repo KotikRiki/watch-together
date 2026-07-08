@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { query, generateId } from "../db/postgres";
+import { broadcastToRoom } from "../socket/handlers";
 
 export const roomsRouter = Router();
 
@@ -75,6 +76,7 @@ roomsRouter.post("/:code/queue", async (req, res) => {
       "INSERT INTO queue (id, room_id, url, title, sort_order) VALUES ($1, $2, $3, $4, $5)",
       [id, roomId, url, title || null, nextOrder]
     );
+    broadcastToRoom(code, "queue-updated", { action: "add", item: { id, url, title: title || null, order: nextOrder } });
     res.json({ id, roomId, url, title: title || null, order: nextOrder });
   } catch (error) {
     console.error("Failed to add to queue:", error);

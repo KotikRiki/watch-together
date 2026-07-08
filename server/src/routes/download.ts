@@ -7,6 +7,22 @@ import crypto from "crypto";
 const downloadDir = path.join(__dirname, "../../downloads");
 if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
+// Auto-delete files older than 2 hours
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 2 * 60 * 60 * 1000;
+  try {
+    for (const f of fs.readdirSync(downloadDir)) {
+      if (!f.endsWith(".mp4")) continue;
+      const stat = fs.statSync(path.join(downloadDir, f));
+      if (now - stat.mtimeMs > maxAge) {
+        fs.unlinkSync(path.join(downloadDir, f));
+        console.log(`Auto-deleted old download: ${f}`);
+      }
+    }
+  } catch {}
+}, 10 * 60 * 1000); // check every 10 minutes
+
 export const downloadRouter = Router();
 
 const activeDownloads = new Map<string, { progress: string; clients: Set<any>; pid?: number }>();
@@ -16,10 +32,14 @@ downloadRouter.post("/", (req, res) => {
   if (!url) return res.status(400).json({ error: "No URL" });
 
   // SSRF protection: block internal URLs
-  const blocked = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|169\.254\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/i;
+  const blocked = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|169\.254\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|::1|fc00:|fd00:|fe80:)/i;
   try {
     const parsed = new URL(url);
-    if (blocked.test(parsed.hostname) || parsed.protocol === "file:") {
+    if (blocked.test(parsed.hostname) || parsed.protocol === "file:" || parsed.protocol === "data:") {
+      return res.status(403).json({ error: "URL not allowed" });
+    }
+    // Block cloud metadata endpoints
+    if (parsed.hostname === "169.254.169.254" || parsed.hostname === "metadata.google.internal") {
       return res.status(403).json({ error: "URL not allowed" });
     }
   } catch {
@@ -55,6 +75,19 @@ downloadRouter.post("/", (req, res) => {
   const entry = activeDownloads.get(hash)!;
   entry.pid = proc.pid;
 
+  // Kill process after 30 minutes timeout
+  const timeout = setTimeout(() => {
+    console.error(`yt-dlp timeout for ${filename}`);
+    proc.kill("SIGTERM");
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    entry.progress = "error";
+    entry.clients.forEach(client => client.write(`data: ${JSON.stringify({ error: "Timeout: скачивание заняло слишком много времени" })}\n\n`));
+    setTimeout(() => {
+      entry.clients.forEach(c => c.end());
+      activeDownloads.delete(hash);
+    }, 3000);
+  }, 30 * 60 * 1000);
+
   let stderr = "";
 
   proc.stdout.on("data", (data) => {
@@ -69,6 +102,7 @@ downloadRouter.post("/", (req, res) => {
   proc.stderr.on("data", (data) => { stderr += data.toString(); });
 
   proc.on("close", (code) => {
+    clearTimeout(timeout);
     if (code === 0 && fs.existsSync(outputPath)) {
       const stat = fs.statSync(outputPath);
       console.log(`Downloaded: ${filename} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
@@ -143,12 +177,15 @@ downloadRouter.get("/stream/:filename", (req, res) => {
       "Accept-Ranges": "bytes",
       "Content-Length": chunkSize,
       "Content-Type": "video/mp4",
+      "Cache-Control": "no-cache",
     });
     fs.createReadStream(filePath, { start, end }).pipe(res);
   } else {
     res.writeHead(200, {
       "Content-Length": fileSize,
       "Content-Type": "video/mp4",
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "no-cache",
     });
     fs.createReadStream(filePath).pipe(res);
   }

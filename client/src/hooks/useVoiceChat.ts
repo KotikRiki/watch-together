@@ -33,7 +33,8 @@ const ICE_SERVERS: RTCConfiguration = {
 };
 
 const VAD_THRESHOLD = 30;
-const VAD_CHECK_INTERVAL = 150;
+const VAD_CHECK_INTERVAL = 500;
+const RECORDING_CHUNK_INTERVAL = 60000; // 60 seconds per chunk upload
 
 interface PeerConnection {
   socketId: string;
@@ -46,9 +47,23 @@ interface VoiceChatOptions {
   username: string;
 }
 
-export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
+function getSupportedMimeType(): string | null {
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ];
+  for (const type of types) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return null;
+}
+
+export function useVoiceChat({ socket, roomCode, username }: VoiceChatOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
   const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
   const [voiceUserCount, setVoiceUserCount] = useState(0);
   const [localVolume, setLocalVolume] = useState(0);
@@ -60,11 +75,28 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
+  // Recording state
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chunkIndexRef = useRef(0);
+  const sessionStartRef = useRef<string>("");
+  const lastChunkTimeRef = useRef<number>(0);
+
   const cleanup = useCallback(() => {
     if (vadIntervalRef.current) {
       clearInterval(vadIntervalRef.current);
       vadIntervalRef.current = null;
     }
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      try { recorderRef.current.stop(); } catch {}
+    }
+    recorderRef.current = null;
+    audioChunksRef.current = [];
     peersRef.current.forEach(({ pc }) => pc.close());
     peersRef.current.clear();
     audioElementsRef.current.forEach((el) => {
@@ -101,7 +133,7 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       vadIntervalRef.current = setInterval(() => {
-        if (!analyserRef.current) return;
+        if (!analyserRef.current || isMutedRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setLocalVolume(avg);
@@ -113,6 +145,88 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
       console.error("VAD init failed:", e);
     }
   }, [socket, roomCode]);
+
+  const uploadAudioChunk = useCallback(
+    async (blob: Blob, chunkIndex: number, durationSec: number) => {
+      if (!roomCode || blob.size === 0) return;
+      const formData = new FormData();
+      formData.append("audio", blob, `voice-${Date.now()}.webm`);
+      formData.append("roomCode", roomCode);
+      formData.append("username", username || "anonymous");
+      formData.append("chunkIndex", String(chunkIndex));
+      formData.append("duration", String(durationSec.toFixed(1)));
+
+      try {
+        await fetch("/api/voice-upload", { method: "POST", body: formData });
+      } catch (e) {
+        console.error("Voice chunk upload failed:", e);
+      }
+    },
+    [roomCode, username]
+  );
+
+  const startRecording = useCallback(
+    (stream: MediaStream) => {
+      const mimeType = getSupportedMimeType();
+      if (!mimeType) {
+        console.warn("[Recording] No supported MIME type, recording disabled");
+        return;
+      }
+      try {
+        const recorder = new MediaRecorder(stream, { mimeType });
+        recorderRef.current = recorder;
+        audioChunksRef.current = [];
+        chunkIndexRef.current = 0;
+        sessionStartRef.current = new Date().toISOString();
+        lastChunkTimeRef.current = Date.now();
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          if (audioChunksRef.current.length > 0) {
+            const blob = new Blob(audioChunksRef.current, { type: mimeType });
+            const durationSec = (Date.now() - lastChunkTimeRef.current) / 1000;
+            await uploadAudioChunk(blob, chunkIndexRef.current, durationSec);
+            audioChunksRef.current = [];
+          }
+        };
+
+        recorder.start(RECORDING_CHUNK_INTERVAL);
+
+        recordingIntervalRef.current = setInterval(async () => {
+          if (recorderRef.current && recorderRef.current.state === "recording" && audioChunksRef.current.length > 0) {
+            const blob = new Blob(audioChunksRef.current, { type: mimeType });
+            const durationSec = RECORDING_CHUNK_INTERVAL / 1000;
+            await uploadAudioChunk(blob, chunkIndexRef.current, durationSec);
+            chunkIndexRef.current++;
+            audioChunksRef.current = [];
+            lastChunkTimeRef.current = Date.now();
+            recorderRef.current.stop();
+            recorderRef.current.start(RECORDING_CHUNK_INTERVAL);
+          }
+        }, RECORDING_CHUNK_INTERVAL);
+
+        console.log("[Recording] Started, mimeType:", mimeType);
+      } catch (e) {
+        console.error("[Recording] Failed to start:", e);
+      }
+    },
+    [uploadAudioChunk]
+  );
+
+  const stopRecording = useCallback(async () => {
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    recorderRef.current = null;
+    chunkIndexRef.current = 0;
+  }, []);
 
   const createPeer = useCallback(
     (targetSocketId: string, isInitiator: boolean) => {
@@ -139,13 +253,13 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
         pc.addTrack(track, localStreamRef.current!);
       });
 
-      pc.onicecandidate = (e) => {
+      pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => {
         if (e.candidate) {
           socket.emit("voice-ice", roomCode, targetSocketId, e.candidate);
         }
       };
 
-      pc.ontrack = (e) => {
+      pc.ontrack = (e: RTCTrackEvent) => {
         console.log("ontrack from", targetSocketId, "streams:", e.streams.length);
         let audioEl = audioElementsRef.current.get(targetSocketId);
         if (!audioEl) {
@@ -182,14 +296,14 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
 
       if (isInitiator) {
         pc.createOffer()
-          .then((offer) => pc.setLocalDescription(offer))
+          .then((offer: RTCSessionDescriptionInit) => pc.setLocalDescription(offer))
           .then(() => {
             if (pc.localDescription) {
               console.log("Sending offer to", targetSocketId);
               socket.emit("voice-offer", roomCode, targetSocketId, pc.localDescription);
             }
           })
-          .catch((e) => console.error("createOffer failed:", e));
+          .catch((e: any) => console.error("createOffer failed:", e));
       }
 
       return pc;
@@ -199,6 +313,10 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
 
   const joinVoice = useCallback(async () => {
     if (!socket || !roomCode) return;
+    if (voiceUserCount >= MAX_VOICE_USERS) {
+      alert(`Голосовой чат заполнен (макс. ${MAX_VOICE_USERS} пользователей)`);
+      return;
+    }
     if (!_webRtcSupported) {
       const isTg = isTelegramWebView();
       const msg = isTg
@@ -216,6 +334,7 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
       setIsConnected(true);
       socket.emit("voice-join", roomCode);
       startVAD();
+      startRecording(stream);
     } catch (err) {
       console.error("Failed to get microphone:", err);
       alert("Не удалось получить доступ к микрофону. Проверьте разрешения браузера.");
@@ -223,11 +342,12 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
   }, [socket, roomCode, startVAD]);
 
   const leaveVoice = useCallback(() => {
+    stopRecording();
     if (socket && roomCode) {
       socket.emit("voice-leave", roomCode);
     }
     cleanup();
-  }, [socket, roomCode, cleanup]);
+  }, [socket, roomCode, cleanup, stopRecording]);
 
   const toggleMute = useCallback(() => {
     if (!localStreamRef.current) return;
@@ -235,8 +355,19 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
     if (audioTrack) {
       audioTrack.enabled = !audioTrack.enabled;
       setIsMuted(!audioTrack.enabled);
+      isMutedRef.current = !audioTrack.enabled;
+      if (!audioTrack.enabled) setLocalVolume(0);
+      if (recorderRef.current) {
+        if (audioTrack.enabled && recorderRef.current.state === "paused") {
+          recorderRef.current.resume();
+        } else if (!audioTrack.enabled && recorderRef.current.state === "recording") {
+          recorderRef.current.pause();
+        }
+      }
     }
   }, []);
+
+const MAX_VOICE_USERS = 5;
 
   useEffect(() => {
     if (!socket || !roomCode) return;
@@ -244,7 +375,12 @@ export function useVoiceChat({ socket, roomCode }: VoiceChatOptions) {
     // New joiner receives list of existing voice users → create offers to all
     const handleVoiceUsers = (users: { socketId: string; username: string }[]) => {
       console.log("voice-users received:", users.length, "existing users");
-      setVoiceUserCount(users.length + 1);
+      const total = users.length + 1;
+      setVoiceUserCount(total);
+      if (total > MAX_VOICE_USERS) {
+        console.warn("Voice chat full, not connecting");
+        return;
+      }
       users.forEach((u) => {
         if (!peersRef.current.has(u.socketId)) {
           createPeer(u.socketId, true);

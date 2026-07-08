@@ -22,8 +22,6 @@ export function useChat({
   socket,
   roomCode,
   username,
-  on,
-  off,
 }: UseChatOptions) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -58,7 +56,7 @@ export function useChat({
   const sendMessage = useCallback(() => {
     if (!chatInput.trim()) return;
     if (!username) return;
-    socket?.emit("chat-message", roomCode, username, chatInput.trim(), replyTo?.id || null);
+    socket?.emit("chat-message", roomCode, { author: username, text: chatInput.trim(), replyToId: replyTo?.id || null });
     setChatInput("");
     setReplyTo(null);
   }, [chatInput, username, socket, roomCode, replyTo]);

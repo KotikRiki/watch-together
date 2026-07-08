@@ -1,4 +1,4 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import { useEffect, useRef, useImperativeHandle, useCallback, forwardRef } from "react";
 
 declare global {
   interface Window {
@@ -43,15 +43,25 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onExternalStateChange, onUserAction, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, onUserAction, syncAction }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
     const syncActiveRef = useRef(false);
+    const lastCommandTimeRef = useRef(0);
+    const adTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
+
+    const handleAdDetected = useCallback(() => {
+      onAdStateChange?.(true);
+      if (adTimerRef.current) clearTimeout(adTimerRef.current);
+      adTimerRef.current = setTimeout(() => {
+        onAdStateChange?.(false);
+      }, 5000);
+    }, [onAdStateChange]);
 
     // HTML5 video player for uploaded files
     useEffect(() => {
@@ -120,17 +130,26 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           }
           if (msg.event === "onStateChange") {
             const state = msg.info?.playerState;
+            const isOurCommand = Date.now() - lastCommandTimeRef.current < 1500;
             if (state === 1) { // PLAYING
               onStateChange?.("playing");
               if (!syncActiveRef.current) {
-                onExternalStateChange?.("playing");
-                onUserAction?.("play", msg.info?.currentTime || 0);
+                if (isOurCommand) {
+                  onExternalStateChange?.("playing");
+                  onUserAction?.("play", msg.info?.currentTime || 0);
+                } else {
+                  handleAdDetected();
+                }
               }
             } else if (state === 2) { // PAUSED
               onStateChange?.("paused");
               if (!syncActiveRef.current) {
-                onExternalStateChange?.("paused");
-                onUserAction?.("pause", msg.info?.currentTime || 0);
+                if (isOurCommand) {
+                  onExternalStateChange?.("paused");
+                  onUserAction?.("pause", msg.info?.currentTime || 0);
+                } else {
+                  handleAdDetected();
+                }
               }
             } else if (state === 0) { // ENDED
               onStateChange?.("ended");
@@ -166,17 +185,26 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
             onPlayerReady?.();
           }
           if (msg.type === "player:changeState") {
+            const isOurCommand = Date.now() - lastCommandTimeRef.current < 1500;
             if (msg.data?.state === "playing") {
               onStateChange?.("playing");
               if (!syncActiveRef.current) {
-                onExternalStateChange?.("playing");
-                onUserAction?.("play", currentTimeRef.current);
+                if (isOurCommand) {
+                  onExternalStateChange?.("playing");
+                  onUserAction?.("play", currentTimeRef.current);
+                } else {
+                  handleAdDetected();
+                }
               }
             } else if (msg.data?.state === "paused") {
               onStateChange?.("paused");
               if (!syncActiveRef.current) {
-                onExternalStateChange?.("paused");
-                onUserAction?.("pause", currentTimeRef.current);
+                if (isOurCommand) {
+                  onExternalStateChange?.("paused");
+                  onUserAction?.("pause", currentTimeRef.current);
+                } else {
+                  handleAdDetected();
+                }
               }
             }
           }
@@ -189,6 +217,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // Handle sync action from peer
     useEffect(() => {
       if (!syncAction) return;
+      lastCommandTimeRef.current = Date.now();
       syncActiveRef.current = true;
       setTimeout(() => { syncActiveRef.current = false; }, 1500);
       if (syncAction.action === "play") {
@@ -232,12 +261,14 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // Imperative methods
     useImperativeHandle(ref, () => ({
       play: () => {
+        lastCommandTimeRef.current = Date.now();
         if (isFile) videoRef.current?.play();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
         return true;
       },
       pause: () => {
+        lastCommandTimeRef.current = Date.now();
         if (isFile) videoRef.current?.pause();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
@@ -300,6 +331,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     useEffect(() => {
       readyRef.current = false;
       currentTimeRef.current = 0;
+      if (adTimerRef.current) clearTimeout(adTimerRef.current);
     }, [videoUrl, videoInfo?.id, isFile]);
 
     // Empty state
@@ -314,15 +346,19 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     // File player — no native controls, custom overlay from Room
     if (isFile) {
       return (
-        <div className="w-full h-full bg-black overflow-hidden">
+        <div className="w-full h-full bg-black overflow-hidden relative">
           <video
             ref={videoRef}
             src={videoUrl}
             className="absolute inset-0 w-full h-full object-contain"
             playsInline
-            preload="metadata"
+            preload="auto"
             onClick={(e) => e.stopPropagation()}
-            onError={() => onStateChange?.("ended")}
+            onError={(e) => {
+              const vid = e.currentTarget;
+              console.error("Video load error:", vid.error?.code, vid.error?.message);
+              onStateChange?.("ended");
+            }}
           />
         </div>
       );

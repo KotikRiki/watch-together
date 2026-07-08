@@ -7,6 +7,28 @@ import { query, generateId } from "../db/postgres";
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
+// Simple rate limiter: max 5 uploads per IP per hour
+const uploadCounts = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = uploadCounts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    uploadCounts.set(ip, { count: 1, resetAt: now + 3600000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
+// Cleanup old entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of uploadCounts) {
+    if (now > entry.resetAt) uploadCounts.delete(ip);
+  }
+}, 600000);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -30,6 +52,13 @@ export const uploadRouter = Router();
 
 uploadRouter.post("/", upload.single("video"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
+
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  if (!checkRateLimit(ip)) {
+    // Delete the uploaded file
+    fs.unlink(req.file.path, () => {});
+    return res.status(429).json({ error: "Too many uploads. Try again later." });
+  }
 
   const filename = req.file.filename;
   const url = `/uploads/${filename}`;
@@ -57,37 +86,41 @@ uploadRouter.post("/", upload.single("video"), async (req, res) => {
 });
 
 export function setupUploadServing(app: any) {
-  app.use("/uploads", (req: any, res: any, next: any) => {
+  app.use("/uploads", async (req: any, res: any, next: any) => {
     const safeName = path.basename(req.url);
     const filePath = path.join(uploadDir, safeName);
-    if (!fs.existsSync(filePath)) return next();
+    try {
+      const stat = await fs.promises.stat(filePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
 
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-
-    if (range) {
-      const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunksize = end - start + 1;
-      const file = fs.createReadStream(filePath, { start, end });
-      const head = {
-        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-        "Accept-Ranges": "bytes",
-        "Content-Length": chunksize,
-        "Content-Type": "video/mp4",
-      };
-      res.writeHead(206, head);
-      file.pipe(res);
-    } else {
-      const head = {
-        "Content-Length": fileSize,
-        "Content-Type": "video/mp4",
-        "Accept-Ranges": "bytes",
-      };
-      res.writeHead(200, head);
-      fs.createReadStream(filePath).pipe(res);
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = end - start + 1;
+        const file = fs.createReadStream(filePath, { start, end });
+        const head = {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunksize,
+          "Content-Type": "video/mp4",
+          "Cache-Control": "public, max-age=7200",
+        };
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        const head = {
+          "Content-Length": fileSize,
+          "Content-Type": "video/mp4",
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=7200",
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(filePath).pipe(res);
+      }
+    } catch {
+      next();
     }
   });
 }

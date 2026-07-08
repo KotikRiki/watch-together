@@ -5,6 +5,7 @@ export function CreateRoom() {
   const navigate = useNavigate();
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [joinError, setJoinError] = useState("");
 
   const apiUrl = window.location.port === "5173"
     ? `http://${window.location.hostname}:3001`
@@ -27,9 +28,19 @@ export function CreateRoom() {
     }
   };
 
-  const handleJoin = () => {
-    if (joinCode.trim()) {
-      navigate(`/room/${joinCode.trim().toUpperCase()}`);
+  const handleJoin = async () => {
+    if (!joinCode.trim()) return;
+    setJoinError("");
+    try {
+      const code = joinCode.trim().toUpperCase();
+      const res = await fetch(`${apiUrl}/api/rooms/${code}`);
+      if (res.ok) {
+        navigate(`/room/${code}`);
+      } else {
+        setJoinError("Комната не найдена");
+      }
+    } catch {
+      setJoinError("Ошибка соединения");
     }
   };
 
@@ -93,6 +104,7 @@ export function CreateRoom() {
                 if (e.key === "Enter") handleJoin();
               }}
             />
+            {joinError && <p className="text-red-400 text-xs text-center mb-3">{joinError}</p>}
             <button
               onClick={handleJoin}
               disabled={!joinCode.trim()}

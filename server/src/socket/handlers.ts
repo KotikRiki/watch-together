@@ -3,6 +3,7 @@ import { query, generateId } from "../db/postgres";
 import { logEvent } from "../db/logger";
 
 interface RoomState {
+  roomId: string | null;
   videoUrl: string | null;
   videoType: "embed" | "file";
   isPlaying: boolean;
@@ -21,27 +22,67 @@ interface RoomState {
 const rooms = new Map<string, RoomState>();
 let ioRef: Server | null = null;
 
+// Message buffer for batch DB writes
+const messageBuffer: { roomId: string; msgId: string; author: string; text: string; replyToId: string | null; createdAt: string }[] = [];
+
+async function flushMessages() {
+  if (messageBuffer.length === 0) return;
+  const batch = messageBuffer.splice(0, messageBuffer.length);
+  const values: any[] = [];
+  const placeholders = batch.map((m, i) => {
+    values.push(m.msgId, m.roomId, m.author, m.text, m.replyToId);
+    return `($${i * 5 + 1}, $${i * 5 + 2}, $${i * 5 + 3}, $${i * 5 + 4}, $${i * 5 + 5})`;
+  }).join(", ");
+  try {
+    await query(`INSERT INTO messages (id, room_id, author, text, reply_to_id) VALUES ${placeholders}`, values);
+  } catch (err: any) {
+    console.error("Failed to flush messages:", err.message);
+  }
+}
+
+setInterval(flushMessages, 5000);
+
 export function broadcastToRoom(roomCode: string, event: string, data: any) {
   ioRef?.to(roomCode).emit(event, data);
 }
 
 async function flushWatchTime(roomCode: string) {
   const roomState = rooms.get(roomCode);
-  if (!roomState || !roomState.videoUrl) return;
+  if (!roomState || !roomState.videoUrl || roomState.watchAccumulator.size === 0) return;
 
-  const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
-  if (roomResult.rows.length === 0) return;
-  const roomId = roomResult.rows[0].id;
-
-  for (const [username, seconds] of roomState.watchAccumulator) {
-    if (seconds <= 0) continue;
-    await query(
-      `INSERT INTO watch_sessions (room_id, video_url, username, watched_seconds)
-       VALUES ($1, $2, $3, $4)`,
-      [roomId, roomState.videoUrl, username, seconds]
-    );
+  let roomId = roomState.roomId;
+  if (!roomId) {
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+    if (roomResult.rows.length === 0) return;
+    roomId = roomResult.rows[0].id;
+    roomState.roomId = roomId;
   }
+
+  const entries = Array.from(roomState.watchAccumulator.entries()).filter(([, s]) => s > 0);
+  if (entries.length === 0) { roomState.watchAccumulator.clear(); return; }
+
+  // Batch insert
+  const values: any[] = [];
+  const placeholders = entries.map(([, seconds], i) => {
+    values.push(roomId, roomState.videoUrl, entries[i][0], seconds);
+    return `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`;
+  }).join(", ");
+
+  await query(
+    `INSERT INTO watch_sessions (room_id, video_url, username, watched_seconds) VALUES ${placeholders}`,
+    values
+  );
   roomState.watchAccumulator.clear();
+}
+
+const flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function debouncedFlush(roomCode: string) {
+  if (flushTimers.has(roomCode)) return;
+  flushTimers.set(roomCode, setTimeout(() => {
+    flushTimers.delete(roomCode);
+    flushWatchTime(roomCode);
+  }, 5000));
 }
 
 export function setupSocketHandlers(io: Server) {
@@ -51,11 +92,14 @@ export function setupSocketHandlers(io: Server) {
 
     socket.on("join-room", async (roomCode: string, username: string) => {
       socket.join(roomCode);
+      (socket as any).roomCode = roomCode;
+      (socket as any).username = username;
 
       if (!rooms.has(roomCode)) {
         const result = await query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
         const videoUrl = result.rows[0]?.video_url || null;
         rooms.set(roomCode, {
+          roomId: null,
           videoUrl,
           videoType: "embed",
           isPlaying: false,
@@ -108,23 +152,29 @@ export function setupSocketHandlers(io: Server) {
       if (roomState.hostOnly && roomState.hostSocketId !== socket.id) return;
 
       const changedBy = roomState.usernames.get(socket.id) || "unknown";
+      logEvent(roomCode, changedBy, socket.id, "change-video", { videoUrl, videoType, from: roomState.videoUrl });
 
-      await flushWatchTime(roomCode);
+      debouncedFlush(roomCode);
 
-      const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
-      if (roomResult.rows.length > 0) {
-        const roomId = roomResult.rows[0].id;
+      let roomId = roomState.roomId;
+      if (!roomId) {
+        const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+        if (roomResult.rows.length > 0) {
+          roomId = roomResult.rows[0].id;
+          roomState.roomId = roomId;
+        }
+      }
 
+      if (roomId) {
         if (roomState.videoUrl) {
           await query(
             "INSERT INTO video_history (room_id, url, changed_by) VALUES ($1, $2, $3)",
             [roomId, roomState.videoUrl, changedBy]
           );
         }
-
         await query(
-          "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE code = $2",
-          [videoUrl, roomCode]
+          "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE id = $2",
+          [videoUrl, roomId]
         );
       }
 
@@ -145,24 +195,16 @@ export function setupSocketHandlers(io: Server) {
       roomState.currentTime = time;
       roomState.lastSyncTime = Date.now();
 
-      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
       logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "video-action", { action, time });
+
+      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
     });
 
-    socket.on("heartbeat", (roomCode: string, time: number, isPlaying: boolean) => {
-      const roomState = rooms.get(roomCode);
-      if (!roomState) return;
-      if (roomState.hostSocketId !== socket.id) return;
-
-      roomState.currentTime = time;
-      roomState.isPlaying = isPlaying;
-      io.to(roomCode).emit("heartbeat", { time, isPlaying, userId: socket.id });
-    });
-
-    socket.on("user-time", (roomCode: string, time: number, isPlaying: boolean, username: string) => {
+    socket.on("heartbeat", (roomCode: string, time: number, isPlaying: boolean, username: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
 
+      // Update watch time accumulator
       const prev = roomState.userTimes.get(socket.id);
       if (prev && prev.isPlaying && isPlaying && roomState.videoUrl) {
         const delta = Math.abs(time - prev.time);
@@ -171,11 +213,25 @@ export function setupSocketHandlers(io: Server) {
           roomState.watchAccumulator.set(username, current + delta);
         }
       }
-
       roomState.userTimes.set(socket.id, { time, isPlaying, username });
-      const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
-      roomState.userTimes.forEach((val) => timesArray.push(val));
-      io.to(roomCode).emit("user-times", { users: timesArray });
+
+      // If host — broadcast sync to non-host clients only
+      if (roomState.hostSocketId === socket.id) {
+        roomState.currentTime = time;
+        roomState.isPlaying = isPlaying;
+        socket.to(roomCode).emit("heartbeat", { time, isPlaying, userId: socket.id });
+      }
+
+      // Send full user-times only to host (for sync display)
+      if (roomState.hostSocketId && roomState.hostSocketId !== socket.id) {
+        const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
+        roomState.userTimes.forEach((val) => timesArray.push(val));
+        const watchTimes: { username: string; seconds: number }[] = [];
+        roomState.watchAccumulator.forEach((seconds, username) => {
+          watchTimes.push({ username, seconds });
+        });
+        io.to(roomState.hostSocketId).emit("user-times", { users: timesArray, watchTimes });
+      }
     });
 
     socket.on("set-host-only", (roomCode: string, hostOnly: boolean) => {
@@ -183,6 +239,7 @@ export function setupSocketHandlers(io: Server) {
       if (!roomState) return;
       if (roomState.hostSocketId !== socket.id) return;
       roomState.hostOnly = hostOnly;
+      logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "set-host-only", { hostOnly });
       io.to(roomCode).emit("host-only-changed", { hostOnly });
     });
 
@@ -202,6 +259,7 @@ export function setupSocketHandlers(io: Server) {
       const socketUsername = roomState.usernames.get(socket.id);
       const hostUsername = roomState.usernames.get(roomState.hostId || "");
       if (socketUsername !== hostUsername) return;
+      logEvent(roomCode, socketUsername || "", socket.id, "ad-started");
       io.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
@@ -211,12 +269,14 @@ export function setupSocketHandlers(io: Server) {
       const socketUsername = roomState.usernames.get(socket.id);
       const hostUsername = roomState.usernames.get(roomState.hostId || "");
       if (socketUsername !== hostUsername) return;
+      logEvent(roomCode, socketUsername || "", socket.id, "ad-ended");
       io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
     socket.on("ad-sync", (roomCode: string, action: string, time: number) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
+      if (roomState.hostOnly && roomState.hostSocketId !== socket.id) return;
 
       roomState.isPlaying = action === "play";
       roomState.currentTime = time;
@@ -226,29 +286,36 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string; replyToId?: string }) => {
-      let roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
-      let roomId: string;
+      if (!message || typeof message.text !== "string" || message.text.length > 5000 || message.text.trim().length === 0) return;
+      if (!message.author || typeof message.author !== "string") return;
 
-      if (roomResult.rows.length === 0) {
-        roomId = generateId();
-        await query(
-          "INSERT INTO rooms (id, code, video_url) VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING",
-          [roomId, roomCode]
-        );
-      } else {
-        roomId = roomResult.rows[0].id;
+      const roomState = rooms.get(roomCode);
+      let roomId = roomState?.roomId;
+
+      if (!roomId) {
+        const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+        if (roomResult.rows.length === 0) {
+          roomId = generateId();
+          await query("INSERT INTO rooms (id, code, video_url) VALUES ($1, $2, NULL) ON CONFLICT DO NOTHING", [roomId, roomCode]);
+        } else {
+          roomId = roomResult.rows[0].id;
+        }
+        if (roomState && roomId) roomState.roomId = roomId;
       }
 
       const msgId = generateId();
-      await query(
-        "INSERT INTO messages (id, room_id, author, text, reply_to_id) VALUES ($1, $2, $3, $4, $5)",
-        [msgId, roomId, message.author, message.text, message.replyToId || null]
-      );
+      const now = new Date().toISOString();
 
-      await query(
-        "UPDATE rooms SET total_messages = total_messages + 1, last_active = NOW() WHERE id = $1",
-        [roomId]
-      );
+      messageBuffer.push({
+        roomId: roomId!,
+        msgId,
+        author: message.author,
+        text: message.text,
+        replyToId: message.replyToId || null,
+        createdAt: now,
+      });
+
+      logEvent(roomCode, message.author, socket.id, "chat-message", { textLen: message.text.length });
 
       io.to(roomCode).emit("new-message", {
         id: msgId,
@@ -256,17 +323,19 @@ export function setupSocketHandlers(io: Server) {
         author: message.author,
         text: message.text,
         replyToId: message.replyToId || null,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       });
-
-      logEvent(roomCode, message.author, socket.id, "chat-message", { text: message.text.substring(0, 100) });
     });
 
     socket.on("emoji-reaction", (roomCode: string, emoji: string) => {
+      const roomState = rooms.get(roomCode);
+      const username = roomState?.usernames.get(socket.id) || "";
+      logEvent(roomCode, username, socket.id, "emoji-reaction", { emoji });
       socket.to(roomCode).emit("reaction", { emoji, userId: socket.id });
     });
 
     socket.on("call-user", (roomCode: string, offer: any, callerName: string) => {
+      logEvent(roomCode, callerName, socket.id, "call-user");
       socket.to(roomCode).emit("call-made", offer, callerName);
     });
 
@@ -279,6 +348,9 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on("end-call", (roomCode: string) => {
+      const roomState = rooms.get(roomCode);
+      const username = roomState?.usernames.get(socket.id) || "";
+      logEvent(roomCode, username, socket.id, "end-call");
       socket.to(roomCode).emit("call-ended");
     });
 
@@ -286,14 +358,17 @@ export function setupSocketHandlers(io: Server) {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
 
-      // Only host can play next
       const socketUsername = roomState.usernames.get(socket.id);
       const hostUsername = roomState.usernames.get(roomState.hostId || "");
       if (socketUsername !== hostUsername) return;
 
-      const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
-      if (roomResult.rows.length === 0) return;
-      const roomId = roomResult.rows[0].id;
+      let roomId = roomState.roomId;
+      if (!roomId) {
+        const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+        if (roomResult.rows.length === 0) return;
+        roomId = roomResult.rows[0].id;
+        roomState.roomId = roomId;
+      }
 
       const nextResult = await query(
         "SELECT id, url, title FROM queue WHERE room_id = $1 ORDER BY sort_order ASC LIMIT 1",
@@ -323,6 +398,8 @@ export function setupSocketHandlers(io: Server) {
       roomState.videoUrl = next.url;
       roomState.currentTime = 0;
       roomState.isPlaying = true;
+
+      logEvent(roomCode, socketUsername || "", socket.id, "play-next", { videoUrl: next.url, title: next.title });
 
       io.to(roomCode).emit("video-changed", { videoUrl: next.url, videoType: /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(next.url) ? "file" : "embed" });
       io.to(roomCode).emit("queue-updated", { action: "next", removedItem: { id: next.id, url: next.url, title: next.title } });
@@ -378,36 +455,38 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on("disconnect", async () => {
+      const roomCode = (socket as any).roomCode;
+      const username = (socket as any).username || "unknown";
+      if (!roomCode) return;
+
       console.log("User disconnected:", socket.id);
-      for (const [roomCode, roomState] of rooms) {
-        if (roomState.users.has(socket.id)) {
-          const username = roomState.usernames.get(socket.id) || "unknown";
-          roomState.users.delete(socket.id);
-          roomState.usernames.delete(socket.id);
-          roomState.userTimes.delete(socket.id);
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
 
-          // Voice chat cleanup
-          if (roomState.voiceUsers.has(socket.id)) {
-            roomState.voiceUsers.delete(socket.id);
-            io.to(roomCode).emit("voice-user-left", socket.id);
-          }
+      roomState.users.delete(socket.id);
+      roomState.usernames.delete(socket.id);
+      roomState.userTimes.delete(socket.id);
 
-          logEvent(roomCode, username, socket.id, "disconnect", { remaining: roomState.users.size });
-
-          await flushWatchTime(roomCode);
-
-          io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
-          const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
-          roomState.userTimes.forEach((val) => timesArray.push(val));
-          io.to(roomCode).emit("user-times", { users: timesArray });
-          if (roomState.hostSocketId === socket.id) {
-            const remaining = Array.from(roomState.users);
-            roomState.hostSocketId = remaining.length > 0 ? remaining[0] : null;
-            if (roomState.hostSocketId) io.to(roomState.hostSocketId).emit("host-changed", { isHost: true });
-          }
-          if (roomState.users.size === 0) rooms.delete(roomCode);
-        }
+      // Voice chat cleanup
+      if (roomState.voiceUsers.has(socket.id)) {
+        roomState.voiceUsers.delete(socket.id);
+        io.to(roomCode).emit("voice-user-left", socket.id);
       }
+
+      logEvent(roomCode, username, socket.id, "disconnect", { remaining: roomState.users.size });
+
+      debouncedFlush(roomCode);
+
+      io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
+      const timesArray: { time: number; isPlaying: boolean; username: string }[] = [];
+      roomState.userTimes.forEach((val) => timesArray.push(val));
+      io.to(roomCode).emit("user-times", { users: timesArray });
+      if (roomState.hostSocketId === socket.id) {
+        const remaining = Array.from(roomState.users);
+        roomState.hostSocketId = remaining.length > 0 ? remaining[0] : null;
+        if (roomState.hostSocketId) io.to(roomState.hostSocketId).emit("host-changed", { isHost: true });
+      }
+      if (roomState.users.size === 0) rooms.delete(roomCode);
     });
   });
 }

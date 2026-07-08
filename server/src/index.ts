@@ -12,20 +12,27 @@ import { stickersRouter } from "./routes/stickers";
 import { downloadRouter } from "./routes/download";
 import { logRouter } from "./routes/log";
 import { loggerRouter } from "./routes/logger";
+import { voiceUploadRouter } from "./routes/voice-upload";
 import { setupSocketHandlers } from "./socket/handlers";
 import { initDB } from "./db/postgres";
+import { logError } from "./db/logger";
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught exception:", err);
+  logError("", "", "uncaughtException", err.message, err.stack);
 });
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled rejection:", err);
+  logError("", "", "unhandledRejection", String(err));
 });
 
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
+  perMessageDeflate: {
+    threshold: 256,
+  },
 });
 
 app.use(cors());
@@ -38,6 +45,7 @@ app.use("/api/stickers", stickersRouter);
 app.use("/api/download", downloadRouter);
 app.use("/api/log", logRouter);
 app.use("/api/logger", loggerRouter);
+app.use("/api/voice-upload", voiceUploadRouter);
 setupUploadServing(app);
 
 app.get("/reset-pwa", (_req, res) => {

@@ -2,21 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { Socket } from "socket.io-client";
 import type { VideoPlayerHandle } from "../components/VideoPlayer";
 
-interface Message {
-  id: string;
-  author: string;
-  text: string;
-  replyToId?: string | null;
-  createdAt: string;
-}
-
-interface QueueItem {
-  id: string;
-  url: string;
-  title: string | null;
-  order: number;
-}
-
 interface UseVideoPlayerOptions {
   socket: Socket | null;
   roomCode: string;
@@ -124,8 +109,9 @@ export function useVideoPlayer({
       }
     };
 
-    const handleUserTimes = (data: { users: { time: number; isPlaying: boolean; username: string }[] }) => {
+    const handleUserTimes = (data: { users: { time: number; isPlaying: boolean; username: string }[]; watchTimes?: { username: string; seconds: number }[] }) => {
       setPeerTimes(data.users);
+      if (data.watchTimes) setWatchTimes(data.watchTimes);
     };
 
     const handleHostChanged = (data: { isHost: boolean }) => {
@@ -195,17 +181,11 @@ export function useVideoPlayer({
   // Heartbeat
   useEffect(() => {
     if (!socket || !playerReady) return;
-    const interval = isLandscape ? 5000 : 3000;
-    let tick = 0;
+    const interval = isLandscape ? 8000 : 5000;
     heartbeatIntervalRef.current = setInterval(() => {
       const time = videoPlayerRef.current?.getCurrentTime() || 0;
       if (!adPlayingRef.current) {
-        socket.emit("heartbeat", roomCode, time, playerStateRef.current === "playing");
-      }
-      socket.emit("user-time", roomCode, time, playerStateRef.current === "playing", username);
-      tick++;
-      if (tick % 3 === 0) {
-        socket.emit("get-watch-time", roomCode);
+        socket.emit("heartbeat", roomCode, time, playerStateRef.current === "playing", username);
       }
     }, interval);
     return () => {
