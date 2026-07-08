@@ -303,27 +303,24 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         const drift = current - targetTime;
         const absDrift = Math.abs(drift);
 
-        if (absDrift < 0.25) {
-          if (vid.playbackRate !== 1) vid.playbackRate = 1;
-          return;
-        }
+        // Ignore small drifts — no correction needed
+        if (absDrift < 1.5) return;
 
-        if (absDrift > 4.5) {
+        // Large drift: hard seek (pause → seek → play)
+        if (absDrift > 5) {
           const wasPlaying = !vid.paused;
           vid.pause();
           vid.currentTime = Math.max(0, targetTime);
           if (wasPlaying && isPlaying) vid.play().catch(() => {});
-          vid.playbackRate = 1;
-        } else {
-          const rate = Math.max(0.8, Math.min(1.2, 1 + drift * -0.3));
-          vid.playbackRate = rate;
-          setTimeout(() => {
-            if (vid && vid.playbackRate !== 1) vid.playbackRate = 1;
-          }, 500);
+          return;
         }
 
-        if (isPlaying && vid.paused) vid.play().catch(() => {});
-        else if (!isPlaying && !vid.paused) vid.pause();
+        // Medium drift (1.5–5s): gentle playback rate adjustment
+        const rate = Math.max(0.9, Math.min(1.1, 1 + drift * -0.15));
+        vid.playbackRate = rate;
+        setTimeout(() => {
+          if (vid && vid.playbackRate !== 1) vid.playbackRate = 1;
+        }, 1000);
       },
     }));
 
