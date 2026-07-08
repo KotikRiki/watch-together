@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
 import { useSafariTabHider, isStandalone, isIOSSafari, tryHideSafariBars } from "../hooks/useSafariTabHider";
@@ -123,7 +123,7 @@ export function Room() {
 
   useSafariTabHider(isMobile);
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     if (isMobile) {
       if (isLandscape) {
         try { await document.exitFullscreen(); } catch {}
@@ -148,7 +148,7 @@ export function Room() {
         await container.requestFullscreen();
       }
     } catch {}
-  };
+  }, [isMobile, isLandscape, isPWA]);
 
   useEffect(() => {
     if (isLandscape && !landscapeChatOpen && !showCall) {

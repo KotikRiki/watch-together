@@ -58,7 +58,7 @@ async function flushWatchTime(roomCode: string) {
     roomState.roomId = roomId;
   }
 
-  const entries = Array.from(roomState.watchAccumulator.entries()).filter(([, s]) => s > 0);
+  const entries = Array.from(roomState.watchAccumulator.entries()).filter(([username, s]) => s > 0 && username);
   if (entries.length === 0) { roomState.watchAccumulator.clear(); return; }
 
   // Batch insert
