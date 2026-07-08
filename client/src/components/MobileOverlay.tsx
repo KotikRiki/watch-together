@@ -21,7 +21,7 @@ interface MobileOverlayProps {
   videoPlayerRef: RefObject<any>;
   videoUrl: string | null;
   videoType: "file" | "embed";
-  playerState: string;
+  playerState: "ended" | "playing" | "paused";
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
@@ -30,6 +30,7 @@ interface MobileOverlayProps {
   syncAction: any;
   handlePlayPause: () => void;
   handleSeek: (time: number) => void;
+  handleSeekRelative: (delta: number) => void;
   handleSync: () => void;
   handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
@@ -94,7 +95,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
   const {
     isLandscape, isFullscreen, videoPlayerRef, videoUrl, videoType, playerState, playerReady,
     canControl, adPlaying, isHost, hostOnly, syncAction,
-    handlePlayPause, handleSeek, handleSync, handleAdStateChange, handleExternalStateChange,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, floatingMessages,
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
@@ -232,6 +233,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
                 videoType={videoType}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
+                onSeekRelative={handleSeekRelative}
                 onSync={handleSync}
                 onToggleAd={toggleManualAd}
                 onToggleFullscreen={toggleFullscreen}
@@ -309,6 +311,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
               videoType={videoType}
               onPlayPause={handlePlayPause}
               onSeek={handleSeek}
+              onSeekRelative={handleSeekRelative}
               onSync={handleSync}
               onToggleAd={toggleManualAd}
               onToggleFullscreen={toggleFullscreen}

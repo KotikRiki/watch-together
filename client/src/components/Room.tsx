@@ -61,10 +61,30 @@ export function Room() {
   const [landscapeBarsVisible, setLandscapeBarsVisible] = useState(true);
   const landscapeBarsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chatExpandedRef = useRef(false);
+  const [safeAreaTop, setSafeAreaTop] = useState(0);
+  const [safeAreaBottom, setSafeAreaBottom] = useState(0);
 
   useEffect(() => {
     chatExpandedRef.current = chatExpanded;
   }, [chatExpanded]);
+
+  // Measure safe area insets (works in PWA standalone mode)
+  useEffect(() => {
+    const update = () => {
+      const top = parseInt(getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-top)") || "0", 10) || 0;
+      const bottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-bottom)") || "0", 10) || 0;
+      // Fallback: use visualViewport offset if env() returns 0
+      if (top === 0 && window.visualViewport) {
+        setSafeAreaTop(Math.max(0, window.visualViewport.offsetTop));
+      } else {
+        setSafeAreaTop(top);
+      }
+      setSafeAreaBottom(bottom);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
     document.title = "Watch Together";
@@ -513,6 +533,7 @@ export function Room() {
             syncAction={videoPlayer.syncAction}
             handlePlayPause={videoPlayer.handlePlayPause}
             handleSeek={videoPlayer.handleSeek}
+            handleSeekRelative={videoPlayer.handleSeekRelative}
             handleSync={videoPlayer.handleSync}
             handleAdStateChange={videoPlayer.handleAdStateChange}
             handleExternalStateChange={videoPlayer.handleExternalStateChange}
@@ -558,7 +579,7 @@ export function Room() {
 
       {/* Mobile layout */}
       {isMobile && (
-        <div ref={roomContainerRef} className="fixed inset-0 bg-[#0a0a0f] flex flex-col transition-all duration-300" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div ref={roomContainerRef} className="fixed inset-0 bg-[#0a0a0f] flex flex-col transition-all duration-300" style={{ paddingTop: safeAreaTop || undefined, paddingBottom: safeAreaBottom || undefined }}>
           <MobileOverlay
             isLandscape={isLandscape}
             isFullscreen={isFullscreen}
@@ -574,6 +595,7 @@ export function Room() {
             syncAction={videoPlayer.syncAction}
             handlePlayPause={videoPlayer.handlePlayPause}
             handleSeek={videoPlayer.handleSeek}
+            handleSeekRelative={videoPlayer.handleSeekRelative}
             handleSync={videoPlayer.handleSync}
             handleAdStateChange={videoPlayer.handleAdStateChange}
             handleExternalStateChange={videoPlayer.handleExternalStateChange}

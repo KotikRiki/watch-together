@@ -37,7 +37,7 @@ interface DesktopLayoutProps {
   videoPlayerRef: RefObject<any>;
   videoUrl: string | null;
   videoType: "file" | "embed";
-  playerState: string;
+  playerState: "ended" | "playing" | "paused";
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
@@ -49,6 +49,7 @@ interface DesktopLayoutProps {
   syncAction: any;
   handlePlayPause: () => void;
   handleSeek: (time: number) => void;
+  handleSeekRelative: (delta: number) => void;
   handleSync: () => void;
   handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
@@ -94,7 +95,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
   const {
     videoPlayerRef, videoUrl, videoType, playerState, playerReady, canControl, adPlaying,
     isHost, hostOnly, isFullscreen, peerTimes, watchTimes, syncAction,
-    handlePlayPause, handleSeek, handleSync, handleAdStateChange, handleExternalStateChange,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, queue, socket, code, username, emitQueueAdd, emitQueueNext,
     handleDownloadToServer, downloading, downloadProgress,
@@ -156,6 +157,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
             videoType={videoType}
             onPlayPause={handlePlayPause}
             onSeek={handleSeek}
+            onSeekRelative={handleSeekRelative}
             onSync={handleSync}
             onToggleAd={toggleManualAd}
             onToggleFullscreen={toggleFullscreen}

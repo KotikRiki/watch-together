@@ -2,19 +2,20 @@ import { formatTime } from "../utils";
 
 interface VideoControlsProps {
   variant: "desktop" | "portrait" | "landscape";
-  playerState: string;
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
   videoUrl: string;
-  videoType: string;
+  videoType: "file" | "embed";
   onPlayPause: () => void;
   onSeek: (time: number) => void;
+  onSeekRelative: (delta: number) => void;
   onSync: () => void;
   onToggleAd: () => void;
   onToggleFullscreen: () => void;
   isFullscreen: boolean;
   currentTime: number;
+  playerState: "ended" | "playing" | "paused";
   voiceConnected: boolean;
   voiceMuted: boolean;
   speakingUsers: Set<string>;
@@ -75,7 +76,7 @@ function AdIcon() {
 }
 
 export function VideoControls(props: VideoControlsProps) {
-  const { variant, playerReady, canControl, adPlaying, videoUrl, videoType, onPlayPause, onSeek, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile } = props;
+  const { variant, playerReady, canControl, adPlaying, videoUrl, videoType, onPlayPause, onSeekRelative, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile } = props;
 
   const voiceBtnClass = `flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${!voiceConnected ? "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50" : voiceMuted ? "bg-red-500/15 text-red-400" : "bg-green-500/15 text-green-400"}`;
 
@@ -97,8 +98,8 @@ export function VideoControls(props: VideoControlsProps) {
           {props.playerState === "playing" ? "Пауза" : "Играть"}
         </button>
         <div className="flex items-center gap-0.5">
-          <button onClick={() => onSeek(Math.max(0, currentTime - 10))} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">-10</button>
-          <button onClick={() => onSeek(currentTime + 10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">+10</button>
+          <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">-10</button>
+          <button onClick={() => onSeekRelative(10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">+10</button>
         </div>
         <button onClick={onSync} disabled={!playerReady || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/30 px-2.5 py-1.5 rounded-lg text-[11px] transition-all" title="Синхронизировать всех">Синхр.</button>
         <button onClick={voiceConnected ? onVoiceToggle : onShowVoiceModal} className={voiceBtnClass}>
@@ -123,10 +124,10 @@ export function VideoControls(props: VideoControlsProps) {
                 <button onClick={onPlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
                   {props.playerState === "playing" ? <PauseIcon /> : <PlayIcon />}
                 </button>
-                <button onClick={() => onSeek(Math.max(0, currentTime - 10))} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
                   <SeekBackIcon />
                 </button>
-                <button onClick={() => onSeek(currentTime + 10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+                <button onClick={() => onSeekRelative(10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
                   <SeekForwardIcon />
                 </button>
               </>
@@ -163,10 +164,10 @@ export function VideoControls(props: VideoControlsProps) {
         <button onClick={onPlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
           {props.playerState === "playing" ? <PauseIcon /> : <PlayIcon />}
         </button>
-        <button onClick={() => onSeek(Math.max(0, currentTime - 10))} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+        <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
           <SeekBackIcon />
         </button>
-        <button onClick={() => onSeek(currentTime + 10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
+        <button onClick={() => onSeekRelative(10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
           <SeekForwardIcon />
         </button>
         {videoType !== "file" && (

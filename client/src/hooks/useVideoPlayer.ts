@@ -226,6 +226,13 @@ export function useVideoPlayer({
     emitAndApply("seek", t, { apply: true });
   }, [canControl, adPlaying, emitAndApply]);
 
+  const handleSeekRelative = useCallback((delta: number) => {
+    if (!canControl || adPlaying) return;
+    const current = videoPlayerRef.current?.getCurrentTime() || 0;
+    const t = Math.max(0, current + delta);
+    emitAndApply("seek", t, { apply: true });
+  }, [canControl, adPlaying, emitAndApply]);
+
   const handleSync = useCallback(() => {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitAndApply("seek", time, { apply: false });
@@ -298,6 +305,7 @@ export function useVideoPlayer({
     emitAndApply,
     handlePlayPause,
     handleSeek,
+    handleSeekRelative,
     handleSync,
     toggleHostOnly,
     handleExternalStateChange,
