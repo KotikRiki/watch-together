@@ -3,6 +3,7 @@ import { VideoCall } from "./VideoCall";
 import { Chat } from "./Chat";
 import { Queue } from "./Queue";
 import { VideoControls } from "./VideoControls";
+import { VideoHistory } from "./VideoHistory";
 import { formatTime } from "../utils";
 import type { RefObject, Dispatch, SetStateAction } from "react";
 
@@ -86,6 +87,7 @@ interface DesktopLayoutProps {
   chat: { messages: Message[]; messagesEndRef: React.RefObject<HTMLDivElement | null> };
   logChatEvent: (roomCode: string, username: string, socketId: string, action: string, data: any) => void;
   toggleFullscreen: () => void;
+  apiUrl: string;
 }
 
 export function DesktopLayout(props: DesktopLayoutProps) {
@@ -99,7 +101,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
     showCall, setShowCall, uploading, uploadProgress, uploadSpeed, uploadRemaining,
     cancelUpload, handleUploadFile, emitChangeVideo, emitChatMessage, handleReaction,
-    chat, logChatEvent, toggleFullscreen,
+    chat, logChatEvent, toggleFullscreen, apiUrl,
   } = props;
 
   const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
@@ -217,6 +219,8 @@ export function DesktopLayout(props: DesktopLayoutProps) {
         </div>
 
         <Queue queue={queue} onAddVideo={emitQueueAdd} onNext={emitQueueNext} onDeleteItem={(id) => { socket?.emit("queue-remove", code, id); }} onDownloadToServer={handleDownloadToServer} downloading={downloading} downloadProgress={downloadProgress} />
+
+        <VideoHistory code={code} apiUrl={apiUrl} />
       </div>
 
       <div className="w-[340px] flex flex-col border-l border-white/5 bg-[#0c0c14] relative z-10">

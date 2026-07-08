@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import rateLimit from "express-rate-limit";
 import { roomsRouter } from "./routes/rooms";
 import { uploadRouter, setupUploadServing } from "./routes/upload";
 import { adminRouter } from "./routes/admin";
@@ -35,17 +36,43 @@ const io = new Server(server, {
   },
 });
 
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  next();
+});
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests" },
+});
+const createLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "Too many room creations" },
+});
+
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/rooms", roomsRouter);
-app.use("/api/upload", uploadRouter);
-app.use("/api/admin", adminRouter);
-app.use("/api/stickers", stickersRouter);
-app.use("/api/download", downloadRouter);
-app.use("/api/log", logRouter);
-app.use("/api/logger", loggerRouter);
-app.use("/api/voice-upload", voiceUploadRouter);
+app.use("/api/rooms", (req, res, next) => {
+  if (req.method === "POST") return createLimiter(req, res, next);
+  return apiLimiter(req, res, next);
+}, roomsRouter);
+app.use("/api/upload", apiLimiter, uploadRouter);
+app.use("/api/admin", apiLimiter, adminRouter);
+app.use("/api/stickers", apiLimiter, stickersRouter);
+app.use("/api/download", apiLimiter, downloadRouter);
+app.use("/api/log", apiLimiter, logRouter);
+app.use("/api/logger", apiLimiter, loggerRouter);
+app.use("/api/voice-upload", apiLimiter, voiceUploadRouter);
 setupUploadServing(app);
 
 app.get("/reset-pwa", (_req, res) => {

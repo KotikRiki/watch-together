@@ -57,6 +57,23 @@ roomsRouter.get("/:code", async (req, res) => {
   }
 });
 
+roomsRouter.get("/:code/history", async (req, res) => {
+  try {
+    const { code } = req.params;
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [code]);
+    if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+    const roomId = roomResult.rows[0].id;
+    const result = await query(
+      "SELECT vh.url, vh.changed_by, vh.created_at FROM video_history vh WHERE vh.room_id = $1 ORDER BY vh.created_at DESC LIMIT 50",
+      [roomId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Failed to get video history:", error);
+    res.status(500).json({ error: "Failed to get video history" });
+  }
+});
+
 roomsRouter.post("/:code/queue", async (req, res) => {
   try {
     const { code } = req.params;

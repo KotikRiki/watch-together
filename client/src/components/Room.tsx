@@ -325,6 +325,37 @@ export function Room() {
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
+  // Keyboard hotkeys
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          videoPlayer.handlePlayPause();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          videoPlayer.handleSeek(Math.max(0, (videoPlayer.videoPlayerRef.current?.getCurrentTime?.() || 0) - 10));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          videoPlayer.handleSeek((videoPlayer.videoPlayerRef.current?.getCurrentTime?.() || 0) + 10);
+          break;
+        case "KeyF":
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case "KeyM":
+          e.preventDefault();
+          toggleMute();
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [videoPlayer.handlePlayPause, videoPlayer.handleSeek, videoPlayer.videoPlayerRef, toggleFullscreen, toggleMute]);
+
   const handleLogin = (name: string) => {
     localStorage.setItem("wt_username", name);
     setUsername(name);
@@ -520,6 +551,7 @@ export function Room() {
             chat={chat}
             logChatEvent={logChatEvent}
             toggleFullscreen={toggleFullscreen}
+            apiUrl={apiUrl}
           />
         </div>
       )}
