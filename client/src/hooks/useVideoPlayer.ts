@@ -49,6 +49,7 @@ export function useVideoPlayer({
   const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatSyncingRef = useRef(false);
+  const videoReadyAtRef = useRef(0);
 
   useEffect(() => {
     playerStateRef.current = playerState;
@@ -57,6 +58,18 @@ export function useVideoPlayer({
   useEffect(() => {
     adPlayingRef.current = adPlaying;
   }, [adPlaying]);
+
+  // Track when player becomes ready for grace period
+  useEffect(() => {
+    if (playerReady) {
+      videoReadyAtRef.current = Date.now();
+    }
+  }, [playerReady]);
+
+  // Reset grace period on video change
+  useEffect(() => {
+    videoReadyAtRef.current = 0;
+  }, [videoUrl]);
 
   // Socket events
   useEffect(() => {
@@ -94,6 +107,8 @@ export function useVideoPlayer({
       if (sinceExternal < 1500) return;
       const sinceUserAction = Date.now() - lastUserActionRef.current;
       if (sinceUserAction < 2000) return;
+      // Grace period after video load — don't correct during initial buffer
+      if (videoReadyAtRef.current && Date.now() - videoReadyAtRef.current < 10000) return;
 
       heartbeatSyncingRef.current = true;
       setTimeout(() => { heartbeatSyncingRef.current = false; }, 500);
