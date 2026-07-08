@@ -304,7 +304,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         const absDrift = Math.abs(drift);
 
         // Ignore small drifts — no correction needed
-        if (absDrift < 1.5) return;
+        if (absDrift < 3) return;
 
         // Large drift: hard seek (pause → seek → play)
         if (absDrift > 5) {
