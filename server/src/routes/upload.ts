@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { execFile } from "child_process";
 import { query, generateId } from "../db/postgres";
 
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -77,6 +78,32 @@ uploadRouter.post("/", upload.single("video"), async (req, res) => {
     [id, roomId, filename, req.file.originalname, req.file.size, username || null]
   );
 
+  // Run ffmpeg faststart in background for mp4 files (moves moov atom to front → instant playback on mobile)
+  const originalExt = path.extname(filename).toLowerCase();
+  const srcPath = req.file.path;
+  if (originalExt === ".mp4") {
+    const tmpPath = srcPath + ".tmp.mp4";
+    execFile("ffmpeg", ["-i", srcPath, "-movflags", "+faststart", "-c", "copy", "-y", tmpPath], {
+      timeout: 300000,
+      maxBuffer: 10 * 1024 * 1024,
+    }, (err) => {
+      if (err) {
+        console.error("ffmpeg faststart failed for", filename, ":", err.message);
+        fs.unlink(tmpPath, () => {});
+        return;
+      }
+      // Replace original with faststart version
+      fs.rename(tmpPath, srcPath, (renameErr) => {
+        if (renameErr) {
+          console.error("ffmpeg faststart rename failed:", renameErr.message);
+          fs.unlink(tmpPath, () => {});
+        } else {
+          console.log("ffmpeg faststart done:", filename);
+        }
+      });
+    });
+  }
+
   res.json({
     url,
     filename,
@@ -84,6 +111,22 @@ uploadRouter.post("/", upload.single("video"), async (req, res) => {
     size: req.file.size,
   });
 });
+
+// Cleanup old uploads every 2 hours (max age 24 hours)
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 24 * 60 * 60 * 1000;
+  try {
+    for (const f of fs.readdirSync(uploadDir)) {
+      const filePath = path.join(uploadDir, f);
+      const stat = fs.statSync(filePath);
+      if (now - stat.mtimeMs > maxAge) {
+        fs.unlinkSync(filePath);
+        console.log("Auto-deleted old upload:", f);
+      }
+    }
+  } catch {}
+}, 2 * 60 * 60 * 1000);
 
 export function setupUploadServing(app: any) {
   app.use("/uploads", async (req: any, res: any, next: any) => {

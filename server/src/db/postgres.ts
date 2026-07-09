@@ -50,10 +50,10 @@ export async function query(text: string, params?: any[]) {
     try {
       return await getPool().query(text, params);
     } catch (err: any) {
-      console.error("PostgreSQL query error, falling back to JSON:", err.message);
-      usePostgres = false;
-      pool = null;
-      return jsonQuery(text, params);
+      console.error("PostgreSQL query error:", err.message);
+      // Don't permanently disable Postgres on a single query error (e.g. NOT NULL constraint)
+      // Only the pool-level error handler resets the pool for connection issues.
+      throw err;
     }
   }
   return jsonQuery(text, params);
@@ -434,6 +434,7 @@ export async function initDB() {
       // Migration: add reply_to_id if missing
       try {
         await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id VARCHAR(20)`);
+      try { await client.query(`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS video_type VARCHAR(10) DEFAULT 'embed'`); } catch {}
       } catch {}
       usePostgres = true;
       console.log("Database initialized (PostgreSQL)");

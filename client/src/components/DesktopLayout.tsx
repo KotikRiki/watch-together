@@ -89,6 +89,7 @@ interface DesktopLayoutProps {
   logChatEvent: (roomCode: string, username: string, socketId: string, action: string, data: any) => void;
   toggleFullscreen: () => void;
   apiUrl: string;
+  displayTime: number;
 }
 
 export function DesktopLayout(props: DesktopLayoutProps) {
@@ -102,10 +103,10 @@ export function DesktopLayout(props: DesktopLayoutProps) {
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
     showCall, setShowCall, uploading, uploadProgress, uploadSpeed, uploadRemaining,
     cancelUpload, handleUploadFile, emitChangeVideo, emitChatMessage, handleReaction,
-    chat, logChatEvent, toggleFullscreen, apiUrl,
+    chat, logChatEvent, toggleFullscreen, apiUrl, displayTime,
   } = props;
 
-  const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+  const currentTime = displayTime || videoPlayerRef.current?.getCurrentTime() || 0;
 
   return (
     <div className="flex flex-1 gap-0 min-h-0">

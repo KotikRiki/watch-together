@@ -103,8 +103,11 @@ roomsRouter.post("/:code/queue", async (req, res) => {
 
 roomsRouter.delete("/:code/queue/:itemId", async (req, res) => {
   try {
-    const { itemId } = req.params;
-    await query("DELETE FROM queue WHERE id = $1", [itemId]);
+    const { code, itemId } = req.params;
+    const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [code]);
+    if (roomResult.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+    const roomId = roomResult.rows[0].id;
+    await query("DELETE FROM queue WHERE id = $1 AND room_id = $2", [itemId, roomId]);
     res.json({ success: true });
   } catch (error) {
     console.error("Failed to remove from queue:", error);

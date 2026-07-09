@@ -30,7 +30,15 @@ process.on("unhandledRejection", (err) => {
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const allowed = ["https://popcornvmeste.xyz", "http://localhost:5173", "http://localhost:3001"];
+      if (allowed.includes(origin) || origin.includes("popcornvmeste.xyz")) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
+    },
+    methods: ["GET", "POST"],
+  },
   perMessageDeflate: {
     threshold: 256,
   },

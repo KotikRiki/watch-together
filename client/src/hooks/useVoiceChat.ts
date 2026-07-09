@@ -132,13 +132,16 @@ export function useVoiceChat({ socket, roomCode, username }: VoiceChatOptions) {
       analyserRef.current = analyser;
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let lastSpeaking = false;
       vadIntervalRef.current = setInterval(() => {
         if (!analyserRef.current || isMutedRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setLocalVolume(avg);
-        if (socket && roomCode) {
-          socket.emit("voice-speaking", roomCode, avg > VAD_THRESHOLD);
+        const speaking = avg > VAD_THRESHOLD;
+        if (socket && roomCode && speaking !== lastSpeaking) {
+          socket.emit("voice-speaking", roomCode, speaking);
+          lastSpeaking = speaking;
         }
       }, VAD_CHECK_INTERVAL);
     } catch (e) {

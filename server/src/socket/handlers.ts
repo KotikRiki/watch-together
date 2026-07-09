@@ -8,6 +8,7 @@ interface RoomState {
   videoType: "embed" | "file";
   isPlaying: boolean;
   currentTime: number;
+  adPlaying: boolean;
   users: Set<string>;
   usernames: Map<string, string>;
   hostSocketId: string | null;
@@ -96,13 +97,15 @@ export function setupSocketHandlers(io: Server) {
       (socket as any).username = username;
 
       if (!rooms.has(roomCode)) {
-        const result = await query("SELECT video_url FROM rooms WHERE code = $1", [roomCode]);
+        const result = await query("SELECT video_url, video_type FROM rooms WHERE code = $1", [roomCode]);
         const videoUrl = result.rows[0]?.video_url || null;
+        const dbVideoType = result.rows[0]?.video_type;
         rooms.set(roomCode, {
           roomId: null,
           videoUrl,
-          videoType: "embed",
+          videoType: (dbVideoType === "file" || dbVideoType === "embed") ? dbVideoType : (videoUrl && /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(videoUrl) ? "file" : "embed"),
           isPlaying: false,
+          adPlaying: false,
           currentTime: 0,
           users: new Set(),
           usernames: new Map(),
@@ -139,6 +142,7 @@ export function setupSocketHandlers(io: Server) {
         hostOnly: roomState.hostOnly,
         currentTime: roomState.currentTime,
         isPlaying: roomState.isPlaying,
+        adPlaying: roomState.adPlaying,
       });
 
       io.to(roomCode).emit("user-count", { userCount: roomState.users.size });
@@ -173,8 +177,8 @@ export function setupSocketHandlers(io: Server) {
           );
         }
         await query(
-          "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE id = $2",
-          [videoUrl, roomId]
+          "UPDATE rooms SET video_url = $1, video_type = $2, last_active = NOW() WHERE id = $3",
+          [videoUrl, videoType === "file" ? "file" : "embed", roomId]
         );
       }
 
@@ -256,20 +260,20 @@ export function setupSocketHandlers(io: Server) {
     socket.on("ad-started", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      const socketUsername = roomState.usernames.get(socket.id);
-      const hostUsername = roomState.usernames.get(roomState.hostId || "");
-      if (socketUsername !== hostUsername) return;
-      logEvent(roomCode, socketUsername || "", socket.id, "ad-started");
+      if (socket.id !== roomState.hostSocketId) return;
+      roomState.adPlaying = true;
+      const socketUsername = roomState.usernames.get(socket.id) || "";
+      logEvent(roomCode, socketUsername, socket.id, "ad-started");
       io.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
     socket.on("ad-ended", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      const socketUsername = roomState.usernames.get(socket.id);
-      const hostUsername = roomState.usernames.get(roomState.hostId || "");
-      if (socketUsername !== hostUsername) return;
-      logEvent(roomCode, socketUsername || "", socket.id, "ad-ended");
+      if (socket.id !== roomState.hostSocketId) return;
+      roomState.adPlaying = false;
+      const socketUsername = roomState.usernames.get(socket.id) || "";
+      logEvent(roomCode, socketUsername, socket.id, "ad-ended");
       io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
@@ -334,6 +338,44 @@ export function setupSocketHandlers(io: Server) {
       socket.to(roomCode).emit("reaction", { emoji, userId: socket.id });
     });
 
+    socket.on("queue-add", async (roomCode: string, videoUrl: string, title?: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+      let roomId = roomState.roomId;
+      if (!roomId) {
+        const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+        if (roomResult.rows.length === 0) return;
+        roomId = roomResult.rows[0].id;
+        roomState.roomId = roomId;
+      }
+      const maxResult = await query(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM queue WHERE room_id = $1",
+        [roomId]
+      );
+      const nextOrder = maxResult.rows[0].next_order;
+      const id = generateId();
+      await query(
+        "INSERT INTO queue (id, room_id, url, title, sort_order) VALUES ($1, $2, $3, $4, $5)",
+        [id, roomId, videoUrl, title || null, nextOrder]
+      );
+      const item = { id, url: videoUrl, title: title || null, order: nextOrder };
+      io.to(roomCode).emit("queue-updated", { action: "add", item });
+    });
+
+    socket.on("queue-remove", async (roomCode: string, itemId: string) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+      let roomId = roomState.roomId;
+      if (!roomId) {
+        const roomResult = await query("SELECT id FROM rooms WHERE code = $1", [roomCode]);
+        if (roomResult.rows.length === 0) return;
+        roomId = roomResult.rows[0].id;
+        roomState.roomId = roomId;
+      }
+      await query("DELETE FROM queue WHERE id = $1 AND room_id = $2", [itemId, roomId]);
+      io.to(roomCode).emit("queue-updated", { action: "remove", removedItemId: itemId });
+    });
+
     socket.on("call-user", (roomCode: string, offer: any, callerName: string) => {
       logEvent(roomCode, callerName, socket.id, "call-user");
       socket.to(roomCode).emit("call-made", offer, callerName);
@@ -358,9 +400,8 @@ export function setupSocketHandlers(io: Server) {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
 
-      const socketUsername = roomState.usernames.get(socket.id);
-      const hostUsername = roomState.usernames.get(roomState.hostId || "");
-      if (socketUsername !== hostUsername) return;
+      if (socket.id !== roomState.hostSocketId) return;
+      const socketUsername = roomState.usernames.get(socket.id) || "";
 
       let roomId = roomState.roomId;
       if (!roomId) {
@@ -382,10 +423,11 @@ export function setupSocketHandlers(io: Server) {
       }
 
       const next = nextResult.rows[0];
+      const nextVideoType = /\.(mp4|webm|mkv|mov|avi|ogg|ogv)($|\?)/i.test(next.url) ? "file" : "embed";
       await query("DELETE FROM queue WHERE id = $1", [next.id]);
       await query(
-        "UPDATE rooms SET video_url = $1, last_active = NOW() WHERE id = $2",
-        [next.url, roomId]
+        "UPDATE rooms SET video_url = $1, video_type = $2, last_active = NOW() WHERE id = $3",
+        [next.url, nextVideoType, roomId]
       );
 
       if (roomState.videoUrl) {
@@ -396,6 +438,7 @@ export function setupSocketHandlers(io: Server) {
       }
 
       roomState.videoUrl = next.url;
+      roomState.videoType = nextVideoType;
       roomState.currentTime = 0;
       roomState.isPlaying = true;
 

@@ -281,6 +281,17 @@ export function Room() {
     }
   }, [username, socket, isConnected]);
 
+  // Fetch chat history on join
+  useEffect(() => {
+    if (!code) return;
+    fetch(`${apiUrl}/api/rooms/${code}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.messages) chat.handleChatHistory(data.messages);
+      })
+      .catch(() => {});
+  }, [code]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -295,11 +306,13 @@ export function Room() {
       }
     });
 
-    on("queue-updated", (data: { action: string; item?: QueueItem; removedItem?: QueueItem }) => {
+    on("queue-updated", (data: { action: string; item?: QueueItem; removedItem?: QueueItem; removedItemId?: string }) => {
       if (data.action === "add" && data.item) {
         setQueue((prev) => [...prev, data.item!]);
       } else if (data.action === "next" && data.removedItem) {
         setQueue((prev) => prev.filter((item) => item.id !== data.removedItem!.id));
+      } else if (data.action === "remove" && data.removedItemId) {
+        setQueue((prev) => prev.filter((item) => item.id !== data.removedItemId));
       }
     });
 
@@ -574,6 +587,7 @@ export function Room() {
             logChatEvent={logChatEvent}
             toggleFullscreen={toggleFullscreen}
             apiUrl={apiUrl}
+            displayTime={videoPlayer.displayTime}
           />
         </div>
       )}
@@ -605,6 +619,7 @@ export function Room() {
             setPlayerReady={videoPlayer.setPlayerReady}
             toggleManualAd={videoPlayer.toggleManualAd}
             toggleHostOnly={videoPlayer.toggleHostOnly}
+            displayTime={videoPlayer.displayTime}
             reactions={reactions}
             floatingMessages={floatingMessages}
             voiceConnected={voiceConnected}

@@ -159,11 +159,26 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       };
 
       window.addEventListener("message", handleMessage);
+
+      // Tell the YT iframe to start broadcasting state + time updates
+      const sendListening = () => {
+        try { iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening" }), "*"); } catch {}
+      };
+      sendListening();
+      // Retry a few times — the iframe may not be ready immediately
+      const listenRetry = setInterval(sendListening, 1000);
+      // Periodically poll current time as a fallback (in case infoDelivery stops)
+      const pollTime = setInterval(() => {
+        try { iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "getCurrentTime", args: [] }), "*"); } catch {}
+      }, 2000);
+
       readyRef.current = true;
       onPlayerReady?.();
 
       return () => {
         window.removeEventListener("message", handleMessage);
+        clearInterval(listenRetry);
+        clearInterval(pollTime);
         readyRef.current = false;
       };
     }, [videoUrl, videoInfo?.id]);

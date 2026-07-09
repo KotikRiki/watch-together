@@ -107,7 +107,7 @@ export function VideoControls(props: VideoControlsProps) {
           {voiceConnected && speakingUsers.size > 0 && <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />}
         </button>
         <button onClick={onToggleAd} className={`text-[11px] px-2.5 py-1 rounded-lg font-medium transition-all ${adPlaying ? "bg-red-500/15 text-red-400 border border-red-500/10" : "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50 border border-white/5"}`}>
-          {adPlaying ? "Реклама" : "Реклама"}
+          {adPlaying ? "✓ Реклама" : "Реклама"}
         </button>
         <span className="text-[11px] text-white/25 ml-auto font-mono tabular-nums">{formatTime(currentTime)}</span>
       </div>

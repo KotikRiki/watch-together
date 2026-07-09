@@ -75,6 +75,17 @@ downloadRouter.post("/", (req, res) => {
   const entry = activeDownloads.get(hash)!;
   entry.pid = proc.pid;
 
+  proc.on("error", (err) => {
+    console.error("yt-dlp spawn error:", err.message);
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    entry.progress = "error";
+    entry.clients.forEach(client => client.write(`data: ${JSON.stringify({ error: "yt-dlp не установлен или недоступен" })}\n\n`));
+    setTimeout(() => {
+      entry.clients.forEach(c => c.end());
+      activeDownloads.delete(hash);
+    }, 3000);
+  });
+
   // Kill process after 30 minutes timeout
   const timeout = setTimeout(() => {
     console.error(`yt-dlp timeout for ${filename}`);

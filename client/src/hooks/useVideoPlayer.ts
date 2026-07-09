@@ -35,6 +35,7 @@ export function useVideoPlayer({
   const [watchTimes, setWatchTimes] = useState<{ username: string; seconds: number }[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [hostOnly, setHostOnly] = useState(false);
+  const [displayTime, setDisplayTime] = useState(0);
 
   const videoPlayerRef = useRef<VideoPlayerHandle>(null);
   const playerStateRef = useRef<"playing" | "paused" | "ended">("paused");
@@ -217,6 +218,18 @@ export function useVideoPlayer({
     };
   }, [socket, roomCode, playerReady, username, isLandscape]);
 
+  // Periodic time display update (1Hz when playing)
+  useEffect(() => {
+    if (!playerReady || playerState !== "playing") {
+      setDisplayTime(videoPlayerRef.current?.getCurrentTime() || 0);
+      return;
+    }
+    const t = setInterval(() => {
+      setDisplayTime(videoPlayerRef.current?.getCurrentTime() || 0);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [playerReady, playerState]);
+
   const canControl = !hostOnly || isHost;
 
   const emitAndApply = useCallback((action: string, time: number, opts?: { apply?: boolean; cooldown?: boolean }) => {
@@ -317,6 +330,7 @@ export function useVideoPlayer({
     isHost,
     hostOnly,
     canControl,
+    displayTime,
     videoPlayerRef,
     setVideoUrl,
     setVideoType,

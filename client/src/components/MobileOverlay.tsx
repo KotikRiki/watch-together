@@ -32,6 +32,7 @@ interface MobileOverlayProps {
   handleSeek: (time: number) => void;
   handleSeekRelative: (delta: number) => void;
   handleSync: () => void;
+  displayTime: number;
   handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
   handleUserAction: (action: "play" | "pause" | "seek", time: number) => void;
@@ -95,7 +96,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
   const {
     isLandscape, isFullscreen, videoPlayerRef, videoUrl, videoType, playerState, playerReady,
     canControl, adPlaying, isHost, hostOnly, syncAction,
-    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange, displayTime,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, floatingMessages,
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
@@ -109,7 +110,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
     showStickersMobile, setShowStickersMobile, replyToMobile, setReplyToMobile,
   } = props;
 
-  const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+  const currentTime = displayTime || videoPlayerRef.current?.getCurrentTime() || 0;
 
   return (
     <>
