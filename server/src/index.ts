@@ -28,6 +28,7 @@ process.on("unhandledRejection", (err) => {
 });
 
 const app = express();
+app.set("trust proxy", 1);
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
@@ -59,11 +60,13 @@ const apiLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: "Too many requests" },
 });
 const createLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
+  validate: { xForwardedForHeader: false },
   message: { error: "Too many room creations" },
 });
 
