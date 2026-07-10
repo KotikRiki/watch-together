@@ -156,8 +156,8 @@ export function useVideoPlayer({
     };
 
     const handleAdStateChanged = (data: { isAd: boolean }) => {
-      // The ad presser handles its own ad state in toggleManualAd.
-      // Don't process the server echo — it causes double play/pause.
+      // Server uses socket.to() so ad presser never receives this.
+      // But just in case — if we are the presser, ignore.
       if (manualAdRef.current || isAdPresserRef.current) return;
       setAdPlaying(data.isAd);
       adSyncRef.current = true;
@@ -267,11 +267,11 @@ export function useVideoPlayer({
 
   const handlePlayPause = useCallback(() => {
     if (!canControl) return;
-    if (adPlaying && manualAdRef.current) return;
+    if (adPlayingRef.current && manualAdRef.current) return;
     const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitAndApply(action, time, { apply: true });
-  }, [canControl, adPlaying, playerState, emitAndApply]);
+  }, [canControl, playerState, emitAndApply]);
 
   const handleSeek = useCallback((time: number) => {
     if (!canControl || adPlaying) return;
@@ -330,6 +330,7 @@ export function useVideoPlayer({
     const newAd = !adPlaying;
     setAdPlaying(newAd);
     setIsAdPresser(newAd);
+    isAdPresserRef.current = newAd;
     if (newAd) {
       // Start ad
       manualAdRef.current = true;
@@ -338,18 +339,16 @@ export function useVideoPlayer({
         // Auto-end after 30s
         setAdPlaying(false);
         setIsAdPresser(false);
+        isAdPresserRef.current = false;
         manualAdRef.current = false;
         socket?.emit("ad-ended", roomCode);
       }, 30000);
       socket?.emit("ad-started", roomCode);
     } else {
-      // End ad — clear timer, sync time to others (they will play via ad-state-changed)
+      // End ad — just notify server, others will play via ad-state-changed
       if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
       manualAdRef.current = false;
       socket?.emit("ad-ended", roomCode);
-      // Seek others to current time — no play on presser
-      const t = videoPlayerRef.current?.getCurrentTime() || 0;
-      emitAndApply("seek", t, { apply: false, cooldown: false });
     }
   }, [adPlaying, socket, roomCode, emitAndApply]);
 
