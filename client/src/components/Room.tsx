@@ -45,6 +45,9 @@ export function Room() {
   const [showStickersMobile, setShowStickersMobile] = useState(false);
   const [replyToMobile, setReplyToMobile] = useState<Message | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [pendingPassword, setPendingPassword] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const toastIdRef = useRef(0);
   const showToast = useCallback((text: string) => {
@@ -293,10 +296,23 @@ export function Room() {
 
   useEffect(() => {
     if (username && socket && isConnected) {
-      joinRoom(username);
+      joinRoom(username, pendingPassword || undefined);
       logEvent(code || "", username, socket.id || "", "page-load", { url: window.location.href });
     }
-  }, [username, socket, isConnected]);
+  }, [username, socket, isConnected, pendingPassword]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onJoinError = (data: { error: string }) => {
+      if (data.error === "Требуется пароль") {
+        setShowPasswordModal(true);
+      } else {
+        setJoinError(data.error);
+      }
+    };
+    on("join-error", onJoinError);
+    return () => { off("join-error", onJoinError); };
+  }, [socket, on, off]);
 
   // Fetch chat history on join
   useEffect(() => {
@@ -696,6 +712,41 @@ export function Room() {
           onJoin={async () => { await joinVoice(); logVoiceEvent(code || "", username || "", socket?.id || "", "connect"); setShowVoiceModal(false); }}
           onDismiss={() => setShowVoiceModal(false)}
         />
+      )}
+
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#12121a] rounded-2xl p-6 w-full max-w-sm border border-white/5 shadow-2xl">
+            <h2 className="text-lg font-bold text-white mb-1 text-center">🔒 Комната защищена</h2>
+            <p className="text-gray-500 text-center text-sm mb-4">Введите пароль для входа</p>
+            {joinError && <p className="text-red-400 text-xs text-center mb-3">{joinError}</p>}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const input = (e.target as HTMLFormElement).elements.namedItem("roomPassword") as HTMLInputElement;
+              const pw = input.value.trim();
+              if (pw) {
+                setPendingPassword(pw);
+                setShowPasswordModal(false);
+                setJoinError("");
+              }
+            }}>
+              <input
+                name="roomPassword"
+                type="password"
+                placeholder="Пароль..."
+                autoFocus
+                className="w-full bg-white/5 text-white rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600 transition-all text-center"
+              />
+              <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 rounded-xl font-semibold text-sm hover:from-blue-500 hover:to-blue-400 transition-all active:scale-[0.98]">
+                Войти
+              </button>
+            </form>
+            <button onClick={() => { setShowPasswordModal(false); navigate("/"); }} className="w-full text-gray-500 text-xs mt-3 hover:text-gray-300 transition-colors">
+              Назад
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Toasts */}

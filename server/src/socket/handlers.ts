@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { query, generateId } from "../db/postgres";
 import { logEvent } from "../db/logger";
+import { verifyPassword } from "../utils/password";
 
 interface RoomState {
   roomId: string | null;
@@ -91,15 +92,25 @@ export function setupSocketHandlers(io: Server) {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("join-room", async (roomCode: string, username: string) => {
-      socket.join(roomCode);
-      (socket as any).roomCode = roomCode;
-      (socket as any).username = username;
-
+    socket.on("join-room", async (roomCode: string, username: string, password?: string) => {
+      // Load room from DB if not in memory
       if (!rooms.has(roomCode)) {
-        const result = await query("SELECT video_url, video_type FROM rooms WHERE code = $1", [roomCode]);
+        const result = await query("SELECT video_url, video_type, password_hash FROM rooms WHERE code = $1", [roomCode]);
+        if (result.rows.length === 0) {
+          socket.emit("join-error", { error: "Комната не найдена" });
+          return;
+        }
         const videoUrl = result.rows[0]?.video_url || null;
         const dbVideoType = result.rows[0]?.video_type;
+        const passwordHash = result.rows[0]?.password_hash;
+        if (passwordHash && !password) {
+          socket.emit("join-error", { error: "Требуется пароль" });
+          return;
+        }
+        if (passwordHash && password && !verifyPassword(password, passwordHash)) {
+          socket.emit("join-error", { error: "Неверный пароль" });
+          return;
+        }
         rooms.set(roomCode, {
           roomId: null,
           videoUrl,
@@ -117,7 +128,26 @@ export function setupSocketHandlers(io: Server) {
           watchAccumulator: new Map(),
           voiceUsers: new Set(),
         });
+      } else {
+        // Room in memory — still check password if it's first user (room may have been loaded without password check)
+        const roomState = rooms.get(roomCode)!;
+        if (roomState.users.size === 0) {
+          const result = await query("SELECT password_hash FROM rooms WHERE code = $1", [roomCode]);
+          const passwordHash = result.rows[0]?.password_hash;
+          if (passwordHash && !password) {
+            socket.emit("join-error", { error: "Требуется пароль" });
+            return;
+          }
+          if (passwordHash && password && !verifyPassword(password, passwordHash)) {
+            socket.emit("join-error", { error: "Неверный пароль" });
+            return;
+          }
+        }
       }
+
+      socket.join(roomCode);
+      (socket as any).roomCode = roomCode;
+      (socket as any).username = username;
 
       const roomState = rooms.get(roomCode)!;
       const isFirstUser = roomState.users.size === 0;

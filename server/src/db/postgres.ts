@@ -377,6 +377,7 @@ export async function initDB() {
           id VARCHAR(20) PRIMARY KEY,
           code VARCHAR(6) UNIQUE NOT NULL,
           video_url TEXT,
+          password_hash TEXT,
           views INT DEFAULT 0,
           total_messages INT DEFAULT 0,
           created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -435,6 +436,7 @@ export async function initDB() {
       try {
         await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id VARCHAR(20)`);
       try { await client.query(`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS video_type VARCHAR(10) DEFAULT 'embed'`); } catch {}
+      try { await client.query(`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS password_hash TEXT`); } catch {}
       } catch {}
       usePostgres = true;
       console.log("Database initialized (PostgreSQL)");

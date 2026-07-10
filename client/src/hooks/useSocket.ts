@@ -33,9 +33,9 @@ export function useSocket(roomCode: string | null) {
     };
   }, [roomCode]);
 
-  const joinRoom = (username: string) => {
+  const joinRoom = (username: string, password?: string) => {
     if (socketRef.current && roomCode) {
-      socketRef.current.emit("join-room", roomCode, username);
+      socketRef.current.emit("join-room", roomCode, username, password || undefined);
     }
   };
 

@@ -33,6 +33,8 @@ export function CreateRoom() {
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [usePassword, setUsePassword] = useState(false);
+  const [roomPassword, setRoomPassword] = useState("");
   const { recentRooms, addRecentRoom } = useRecentRooms();
 
   const apiUrl = window.location.port === "5173"
@@ -45,7 +47,7 @@ export function CreateRoom() {
       const response = await fetch(`${apiUrl}/api/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ password: usePassword && roomPassword ? roomPassword : undefined }),
       });
       const room = await response.json();
       addRecentRoom(room.code);
@@ -136,6 +138,28 @@ export function CreateRoom() {
               </span>
             ) : "Создать комнату"}
           </button>
+
+          {/* Password toggle */}
+          <div className="mt-4">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <div
+                onClick={() => setUsePassword(!usePassword)}
+                className={`relative w-9 h-5 rounded-full transition-colors ${usePassword ? "bg-blue-500" : "bg-white/10"}`}
+              >
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${usePassword ? "translate-x-4" : ""}`} />
+              </div>
+              <span className="text-gray-400 text-xs">Пароль на комнату</span>
+            </label>
+            {usePassword && (
+              <input
+                type="password"
+                value={roomPassword}
+                onChange={(e) => setRoomPassword(e.target.value)}
+                placeholder="Придумайте пароль"
+                className="w-full bg-white/5 text-white rounded-xl px-4 py-2.5 mt-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 placeholder:text-gray-600 transition-all"
+              />
+            )}
+          </div>
 
           {/* Divider */}
           <div className="flex items-center my-5">

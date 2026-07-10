@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query, generateId } from "../db/postgres";
 import { broadcastToRoom } from "../socket/handlers";
+import { hashPassword } from "../utils/password";
 
 export const roomsRouter = Router();
 
@@ -10,14 +11,15 @@ function generateCode(): string {
 
 roomsRouter.post("/", async (req, res) => {
   try {
-    const { videoUrl } = req.body;
+    const { videoUrl, password } = req.body;
     const code = generateCode();
     const id = generateId();
+    const passwordHash = password ? hashPassword(password) : null;
     await query(
-      "INSERT INTO rooms (id, code, video_url) VALUES ($1, $2, $3)",
-      [id, code, videoUrl || null]
+      "INSERT INTO rooms (id, code, video_url, password_hash) VALUES ($1, $2, $3, $4)",
+      [id, code, videoUrl || null, passwordHash]
     );
-    res.json({ id, code, videoUrl: videoUrl || null });
+    res.json({ id, code, videoUrl: videoUrl || null, hasPassword: !!passwordHash });
   } catch (error) {
     console.error("Failed to create room:", error);
     res.status(500).json({ error: "Failed to create room" });
@@ -44,6 +46,7 @@ roomsRouter.get("/:code", async (req, res) => {
       id: room.id,
       code: room.code,
       videoUrl: room.video_url,
+      hasPassword: !!room.password_hash,
       views: room.views,
       totalMessages: room.total_messages,
       createdAt: room.created_at,
