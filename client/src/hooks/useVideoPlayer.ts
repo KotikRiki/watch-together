@@ -103,6 +103,9 @@ export function useVideoPlayer({
     };
 
     const handleHeartbeat = (data: { time: number; isPlaying: boolean; userId: string }) => {
+      // While an ad is playing on this device, don't let peer heartbeats
+      // (re)start playback — the device stays paused for the ad.
+      if (adPlayingRef.current) return;
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
       if (sinceExternal < 1500) return;
       const sinceUserAction = Date.now() - lastUserActionRef.current;
@@ -297,10 +300,12 @@ export function useVideoPlayer({
     emitAndApply(action, time, { cooldown: true });
   }, [canControl, adPlaying, emitAndApply]);
 
-  const handleAdStateChange = useCallback((isAd: boolean) => {
+    const handleAdStateChange = useCallback((isAd: boolean) => {
     if (manualAdRef.current) return;
     setAdPlaying(isAd);
-  }, [socket, roomCode]);
+    if (isAd) videoPlayerRef.current?.pause();
+    else videoPlayerRef.current?.play();
+  }, []);
 
   const toggleManualAd = useCallback(() => {
     const newAd = !adPlaying;
