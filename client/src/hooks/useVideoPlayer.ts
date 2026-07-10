@@ -46,6 +46,7 @@ export function useVideoPlayer({
   const lastSyncEventRef = useRef(0);
   const syncFromActionRef = useRef(false);
   const manualAdRef = useRef(false);
+  const adSyncRef = useRef(false);
   const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatSyncingRef = useRef(false);
@@ -150,6 +151,11 @@ export function useVideoPlayer({
     const handleAdStateChanged = (data: { isAd: boolean }) => {
       if (manualAdRef.current) return;
       setAdPlaying(data.isAd);
+      // Mark as sync-driven so the resulting native play/pause event
+      // does not re-broadcast (which would pause the device that
+      // pressed the ad, and ping-pong the pause to everyone).
+      adSyncRef.current = true;
+      setTimeout(() => { adSyncRef.current = false; }, 800);
       if (data.isAd) videoPlayerRef.current?.pause();
       else videoPlayerRef.current?.play();
     };
@@ -287,17 +293,19 @@ export function useVideoPlayer({
     socket?.emit("set-host-only", roomCode, newVal);
   }, [isHost, hostOnly, socket, roomCode]);
 
-  const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
+    const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
     if (syncFromActionRef.current) return;
     if (heartbeatSyncingRef.current) return;
+    if (adSyncRef.current) return;
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitAndApply(newState === "playing" ? "play" : "pause", time, { cooldown: true });
   }, [emitAndApply]);
 
-  const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
+    const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
     if (!canControl || adPlaying) return;
     if (isUserActionRef.current) return;
     if (heartbeatSyncingRef.current) return;
+    if (adSyncRef.current) return;
     isUserActionRef.current = true;
     setTimeout(() => { isUserActionRef.current = false; }, 300);
     emitAndApply(action, time, { cooldown: true });

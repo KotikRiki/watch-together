@@ -277,8 +277,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     useImperativeHandle(ref, () => ({
       play: () => {
         lastCommandTimeRef.current = Date.now();
-        syncActiveRef.current = true;
-        setTimeout(() => { syncActiveRef.current = false; }, 800);
         if (isFile) videoRef.current?.play();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:play", data: {} }), "*");
@@ -286,8 +284,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       },
       pause: () => {
         lastCommandTimeRef.current = Date.now();
-        syncActiveRef.current = true;
-        setTimeout(() => { syncActiveRef.current = false; }, 800);
         if (isFile) videoRef.current?.pause();
         else if (videoInfo?.type === "youtube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
         else if (videoInfo?.type === "rutube") iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: "player:pause", data: {} }), "*");
