@@ -148,7 +148,10 @@ export function useVideoPlayer({
     };
 
     const handleAdStateChanged = (data: { isAd: boolean }) => {
+      if (manualAdRef.current) return;
       setAdPlaying(data.isAd);
+      if (data.isAd) videoPlayerRef.current?.pause();
+      else videoPlayerRef.current?.play();
     };
 
     const handleWatchTimeUpdate = (data: { watchTimes: { username: string; seconds: number }[] }) => {
@@ -300,12 +303,12 @@ export function useVideoPlayer({
     emitAndApply(action, time, { cooldown: true });
   }, [canControl, adPlaying, emitAndApply]);
 
-    const handleAdStateChange = useCallback((isAd: boolean) => {
-    if (manualAdRef.current) return;
-    setAdPlaying(isAd);
-    if (isAd) videoPlayerRef.current?.pause();
-    else videoPlayerRef.current?.play();
-  }, []);
+    const handleAdStateChange = useCallback((playing: boolean) => {
+    if (syncFromActionRef.current) return;
+    if (heartbeatSyncingRef.current) return;
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    emitAndApply(playing ? "play" : "pause", time, { cooldown: true });
+  }, [emitAndApply]);
 
   const toggleManualAd = useCallback(() => {
     const newAd = !adPlaying;
@@ -317,8 +320,15 @@ export function useVideoPlayer({
       socket?.emit("ad-ended", roomCode);
     }, 30000);
     if (newAd) socket?.emit("ad-started", roomCode);
-    else socket?.emit("ad-ended", roomCode);
-  }, [adPlaying, socket, roomCode]);
+    else {
+      socket?.emit("ad-ended", roomCode);
+      // Safety re-sync on release (in case the ad was pressed late / times drifted)
+      const t = videoPlayerRef.current?.getCurrentTime() || 0;
+      emitAndApply("seek", t, { apply: false });
+      setSyncAction({ action: "seek", time: t });
+      setTimeout(() => setSyncAction(null), 300);
+    }
+  }, [adPlaying, socket, roomCode, emitAndApply]);
 
   return {
     videoUrl,
