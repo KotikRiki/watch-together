@@ -92,7 +92,8 @@ export function useVideoPlayer({
 
     const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
       syncFromActionRef.current = true;
-      setTimeout(() => { syncFromActionRef.current = false; }, 500);
+      isUserActionRef.current = true;
+      setTimeout(() => { syncFromActionRef.current = false; isUserActionRef.current = false; }, 500);
       if (data.action === "play") {
         videoPlayerRef.current?.play();
       } else if (data.action === "pause") {
