@@ -308,12 +308,21 @@ export function useVideoPlayer({
     setAdPlaying(newAd);
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-    manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    const action = newAd ? "pause" : "play";
-    emitVideoSync(action, time);
-    if (newAd) socket?.emit("ad-started", roomCode);
-    else socket?.emit("ad-ended", roomCode);
+    if (newAd) {
+      videoPlayerRef.current?.pause();
+      socket?.emit("ad-started", roomCode);
+      manualAdTimerRef.current = setTimeout(() => {
+        setAdPlaying(false);
+        manualAdRef.current = false;
+        videoPlayerRef.current?.play();
+        socket?.emit("ad-ended", roomCode);
+      }, 30000);
+    } else {
+      videoPlayerRef.current?.play();
+      socket?.emit("ad-ended", roomCode);
+    }
+    emitVideoSync(newAd ? "pause" : "play", time);
   }, [adPlaying, socket, roomCode, emitVideoSync]);
 
   return {

@@ -322,17 +322,7 @@ export function setupSocketHandlers(io: Server) {
       io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
-    socket.on("ad-sync", (roomCode: string, action: string, time: number) => {
-      const roomState = rooms.get(roomCode);
-      if (!roomState) return;
-      if (roomState.hostOnly && roomState.hostSocketId !== socket.id) return;
 
-      roomState.isPlaying = action === "play";
-      roomState.currentTime = time;
-      roomState.lastSyncTime = Date.now();
-
-      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
-    });
 
     socket.on("chat-message", async (roomCode: string, message: { author: string; text: string; replyToId?: string }) => {
       if (!message || typeof message.text !== "string" || message.text.length > 5000 || message.text.trim().length === 0) return;
