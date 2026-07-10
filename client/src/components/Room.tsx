@@ -557,6 +557,7 @@ export function Room() {
             playerReady={videoPlayer.playerReady}
             canControl={canControl}
             adPlaying={videoPlayer.adPlaying}
+            isAdPresser={videoPlayer.isAdPresser}
             isHost={videoPlayer.isHost}
             hostOnly={videoPlayer.hostOnly}
             isFullscreen={isFullscreen}
@@ -624,6 +625,7 @@ export function Room() {
             playerReady={videoPlayer.playerReady}
             canControl={canControl}
             adPlaying={videoPlayer.adPlaying}
+            isAdPresser={videoPlayer.isAdPresser}
             isHost={videoPlayer.isHost}
             hostOnly={videoPlayer.hostOnly}
             syncAction={videoPlayer.syncAction}

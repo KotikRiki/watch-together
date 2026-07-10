@@ -26,6 +26,7 @@ interface MobileOverlayProps {
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
+  isAdPresser: boolean;
   isHost: boolean;
   hostOnly: boolean;
   syncAction: any;
@@ -97,7 +98,7 @@ function isIOSSafari(): boolean {
 export function MobileOverlay(props: MobileOverlayProps) {
   const {
     isLandscape, isFullscreen, videoPlayerRef, videoUrl, videoType, playerState, playerReady,
-    canControl, adPlaying, isHost, hostOnly, syncAction,
+    canControl, adPlaying, isAdPresser, isHost, hostOnly, syncAction,
     handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange, displayTime, onSetPlaybackRate,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, floatingMessages,
@@ -232,6 +233,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
                 playerReady={playerReady}
                 canControl={canControl}
                 adPlaying={adPlaying}
+                isAdPresser={isAdPresser}
                 videoUrl={videoUrl}
                 videoType={videoType}
                 onPlayPause={handlePlayPause}
@@ -311,6 +313,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
               playerReady={playerReady}
               canControl={canControl}
               adPlaying={adPlaying}
+              isAdPresser={isAdPresser}
               videoUrl={videoUrl}
               videoType={videoType}
               onPlayPause={handlePlayPause}

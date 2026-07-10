@@ -226,6 +226,10 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         } catch {}
       };
       window.addEventListener("message", handleMessage);
+      // Fallback: mark ready immediately so the loader clears even if
+      // the iframe never sends a "player:ready" postMessage.
+      readyRef.current = true;
+      onPlayerReady?.();
       return () => window.removeEventListener("message", handleMessage);
     }, [videoUrl, videoInfo?.id]);
 
@@ -423,7 +427,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         <iframe
           ref={iframeRef}
           key={videoInfo.id}
-          src={`https://rutube.ru/play/embed/${videoInfo.id}`}
+          src={`https://rutube.ru/play/embed/${videoInfo.id}?api=true`}
           className="w-full h-full"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
