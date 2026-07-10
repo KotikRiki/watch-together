@@ -20,7 +20,6 @@ export function useVideoPlayer({
   username,
   isLandscape,
   emitVideoAction,
-  emitVideoSync,
   emitPlayNext,
   on,
   off,
@@ -311,12 +310,9 @@ export function useVideoPlayer({
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
     manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
-    const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    const action = newAd ? "pause" : "play";
-    emitVideoSync(action, time);
     if (newAd) socket?.emit("ad-started", roomCode);
     else socket?.emit("ad-ended", roomCode);
-  }, [adPlaying, emitVideoSync, socket, roomCode]);
+  }, [adPlaying, socket, roomCode]);
 
   return {
     videoUrl,
