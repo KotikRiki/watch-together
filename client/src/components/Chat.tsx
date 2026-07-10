@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { StickerPanel } from "./StickerPanel";
+import { userColor } from "../utils";
 
 interface Message {
   id: string;
@@ -74,7 +75,7 @@ export function Chat({ messages, onSendMessage, onReaction, username }: ChatProp
                 msg.author === username ? "items-end" : "items-start"
               }`}
             >
-              <span className="text-xs text-gray-500 mb-0.5">{msg.author}</span>
+              <span className="text-xs mb-0.5" style={{ color: userColor(msg.author) }}>{msg.author}</span>
               {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
                 <video
                   src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")}

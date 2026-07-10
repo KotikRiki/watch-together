@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { userColor } from "../utils";
 
 interface ChatMessage {
   id: string;
@@ -31,7 +32,7 @@ export function LandscapeChat({ messages, username, onSendMessage, onReaction, o
         {messages.length === 0 && <p className="text-gray-600 text-xs text-center mt-12">Пока нет сообщений</p>}
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"}`}>
-            <span className="text-[10px] text-gray-500 mb-0.5 px-1">{msg.author}</span>
+            <span className="text-[10px] mb-0.5 px-1" style={{ color: userColor(msg.author) }}>{msg.author}</span>
             {msg.text.startsWith("[sticker]") ? (
               <video src={msg.text.replace("[sticker]", "").replace("[/sticker]", "")} className="w-28 h-28 object-contain" autoPlay loop muted playsInline />
             ) : (

@@ -3,6 +3,7 @@ import { VideoCall } from "./VideoCall";
 import { LandscapeChat } from "./LandscapeChat";
 import { StickerPanel } from "./StickerPanel";
 import { VideoControls } from "./VideoControls";
+import { userColor } from "../utils";
 import type { RefObject, Dispatch, SetStateAction } from "react";
 
 interface Message {
@@ -33,6 +34,7 @@ interface MobileOverlayProps {
   handleSeekRelative: (delta: number) => void;
   handleSync: () => void;
   displayTime: number;
+  onSetPlaybackRate?: (rate: number) => void;
   handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
   handleUserAction: (action: "play" | "pause" | "seek", time: number) => void;
@@ -96,7 +98,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
   const {
     isLandscape, isFullscreen, videoPlayerRef, videoUrl, videoType, playerState, playerReady,
     canControl, adPlaying, isHost, hostOnly, syncAction,
-    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange, displayTime,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange, displayTime, onSetPlaybackRate,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, floatingMessages,
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
@@ -153,7 +155,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
       {isLandscape && floatingMessages.map((fm) => (
         <div key={fm.id} className="absolute bottom-16 right-3 z-40 pointer-events-none max-w-[60%] animate-[slideUp_0.3s_ease-out]" style={{ animation: "float-up 5s ease-out forwards" }}>
           <div className="bg-black/60 backdrop-blur rounded-lg px-3 py-1.5 border border-white/5">
-            <span className="text-white/40 text-[9px] block">{fm.author}</span>
+            <span className="text-[9px] block" style={{ color: userColor(fm.author) }}>{fm.author}</span>
             <span className="text-white/80 text-[11px]">{fm.text}</span>
           </div>
         </div>
@@ -253,6 +255,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
                 uploadRemaining={uploadRemaining}
                 onCancelUpload={cancelUpload}
                 onUploadFile={handleUploadFile}
+                onSetPlaybackRate={onSetPlaybackRate}
               />
             </div>
           )}
@@ -331,6 +334,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
               uploadRemaining={uploadRemaining}
               onCancelUpload={cancelUpload}
               onUploadFile={handleUploadFile}
+              onSetPlaybackRate={onSetPlaybackRate}
             />
           )}
 
@@ -411,7 +415,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
                   const replyMsg = msg.replyToId ? chat.messages.find((m) => m.id === msg.replyToId) : null;
                   return (
                     <div key={msg.id} className={`flex flex-col ${msg.author === username ? "items-end" : "items-start"} mb-1.5`}>
-                      <span className="text-[10px] text-gray-500 mb-0.5">{msg.author}</span>
+                      <span className="text-[10px] mb-0.5" style={{ color: userColor(msg.author) }}>{msg.author}</span>
                       {msg.text.startsWith("[sticker]") && msg.text.endsWith("[/sticker]") ? (
                         <div className="relative">
                           {replyMsg && (

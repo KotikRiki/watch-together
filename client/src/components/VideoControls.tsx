@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatTime } from "../utils";
 
 interface VideoControlsProps {
@@ -29,6 +30,7 @@ interface VideoControlsProps {
   uploadRemaining: string;
   onCancelUpload: () => void;
   onUploadFile: (file: File) => void;
+  onSetPlaybackRate?: (rate: number) => void;
 }
 
 function PlayIcon() {
@@ -76,7 +78,15 @@ function AdIcon() {
 }
 
 export function VideoControls(props: VideoControlsProps) {
-  const { variant, playerReady, canControl, adPlaying, videoUrl, videoType, onPlayPause, onSeekRelative, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile } = props;
+  const { variant, playerReady, canControl, adPlaying, videoUrl, videoType, onPlayPause, onSeekRelative, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile, onSetPlaybackRate } = props;
+  const [rateIdx, setRateIdx] = useState(1);
+  const rates = [0.75, 1, 1.25, 1.5, 2];
+  const cycleRate = () => {
+    if (!onSetPlaybackRate) return;
+    const next = (rateIdx + 1) % rates.length;
+    setRateIdx(next);
+    onSetPlaybackRate(rates[next]);
+  };
 
   const voiceBtnClass = `flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${!voiceConnected ? "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/50" : voiceMuted ? "bg-red-500/15 text-red-400" : "bg-green-500/15 text-green-400"}`;
 
@@ -101,6 +111,9 @@ export function VideoControls(props: VideoControlsProps) {
           <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">-10</button>
           <button onClick={() => onSeekRelative(10)} disabled={!playerReady || !canControl || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/50 w-8 h-8 rounded-lg flex items-center justify-center transition-all text-[11px] font-mono">+10</button>
         </div>
+        {videoType === "file" && onSetPlaybackRate && (
+          <button onClick={cycleRate} disabled={!playerReady} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/70 px-2 py-1 rounded-lg text-[11px] font-mono tabular-nums" title="Скорость">{rates[rateIdx]}x</button>
+        )}
         <button onClick={onSync} disabled={!playerReady || adPlaying} className="bg-white/5 hover:bg-white/10 disabled:opacity-30 text-white/30 px-2.5 py-1.5 rounded-lg text-[11px] transition-all" title="Синхронизировать всех">Синхр.</button>
         <button onClick={voiceConnected ? onVoiceToggle : onShowVoiceModal} className={voiceBtnClass}>
           <MicIcon />

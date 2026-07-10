@@ -90,6 +90,7 @@ interface DesktopLayoutProps {
   toggleFullscreen: () => void;
   apiUrl: string;
   displayTime: number;
+  onSetPlaybackRate?: (rate: number) => void;
 }
 
 export function DesktopLayout(props: DesktopLayoutProps) {
@@ -103,7 +104,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
     showCall, setShowCall, uploading, uploadProgress, uploadSpeed, uploadRemaining,
     cancelUpload, handleUploadFile, emitChangeVideo, emitChatMessage, handleReaction,
-    chat, logChatEvent, toggleFullscreen, apiUrl, displayTime,
+    chat, logChatEvent, toggleFullscreen, apiUrl, displayTime, onSetPlaybackRate,
   } = props;
 
   const currentTime = displayTime || videoPlayerRef.current?.getCurrentTime() || 0;
@@ -177,6 +178,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
             uploadRemaining={uploadRemaining}
             onCancelUpload={cancelUpload}
             onUploadFile={handleUploadFile}
+            onSetPlaybackRate={onSetPlaybackRate}
           />
         )}
 

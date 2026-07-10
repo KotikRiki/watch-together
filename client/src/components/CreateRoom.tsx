@@ -1,11 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+
+const RECENT_KEY = "wt_recent_rooms";
+
+function getRecentRooms(): { code: string; at: number }[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function addRecentRoom(code: string) {
+  const list = getRecentRooms().filter(r => r.code !== code);
+  list.unshift({ code: code.toUpperCase(), at: Date.now() });
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 5)));
+}
+
+export function useRecentRooms() {
+  const [rooms, setRooms] = useState<{ code: string; at: number }[]>([]);
+  useEffect(() => {
+    setRooms(getRecentRooms());
+    const onFocus = () => setRooms(getRecentRooms());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+  return { recentRooms: rooms, addRecentRoom };
+}
 
 export function CreateRoom() {
   const navigate = useNavigate();
   const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const { recentRooms, addRecentRoom } = useRecentRooms();
 
   const apiUrl = window.location.port === "5173"
     ? `http://${window.location.hostname}:3001`
@@ -20,6 +48,7 @@ export function CreateRoom() {
         body: JSON.stringify({}),
       });
       const room = await response.json();
+      addRecentRoom(room.code);
       navigate(`/room/${room.code}`);
     } catch (error) {
       console.error("Failed to create room:", error);
@@ -35,6 +64,7 @@ export function CreateRoom() {
       const code = joinCode.trim().toUpperCase();
       const res = await fetch(`${apiUrl}/api/rooms/${code}`);
       if (res.ok) {
+        addRecentRoom(code);
         navigate(`/room/${code}`);
       } else {
         setJoinError("Комната не найдена");
@@ -42,6 +72,11 @@ export function CreateRoom() {
     } catch {
       setJoinError("Ошибка соединения");
     }
+  };
+
+  const handleRecent = (code: string) => {
+    addRecentRoom(code);
+    navigate(`/room/${code}`);
   };
 
   return (
@@ -67,6 +102,24 @@ export function CreateRoom() {
             Смотрите видео вместе в реальном времени
           </p>
         </div>
+
+        {/* Recent rooms */}
+        {recentRooms.length > 0 && (
+          <div className="mb-5">
+            <div className="text-gray-600 text-[11px] uppercase tracking-wider mb-2 px-1">Недавние комнаты</div>
+            <div className="flex flex-wrap gap-2">
+              {recentRooms.map(r => (
+                <button
+                  key={r.code}
+                  onClick={() => handleRecent(r.code)}
+                  className="bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-mono text-sm px-3 py-1.5 rounded-lg border border-white/5 transition-all active:scale-95"
+                >
+                  {r.code}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-[#12121a] rounded-2xl p-5 border border-white/5 shadow-2xl shadow-black/50">

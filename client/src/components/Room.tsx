@@ -9,6 +9,7 @@ import { useChat } from "../hooks/useChat";
 import { VoiceJoinModal } from "./VoiceJoinModal";
 import { DesktopLayout } from "./DesktopLayout";
 import { MobileOverlay } from "./MobileOverlay";
+import { useRecentRooms } from "./CreateRoom";
 
 interface Message {
   id: string;
@@ -29,6 +30,11 @@ export function Room() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [username, setUsername] = useState<string | null>(() => localStorage.getItem("wt_username"));
+  const { addRecentRoom } = useRecentRooms();
+
+  useEffect(() => {
+    if (code) addRecentRoom(code);
+  }, [code, addRecentRoom]);
 
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [reactions, setReactions] = useState<{ id: number; emoji: string; x: number; y: number }[]>([]);
@@ -39,6 +45,13 @@ export function Room() {
   const [showStickersMobile, setShowStickersMobile] = useState(false);
   const [replyToMobile, setReplyToMobile] = useState<Message | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const toastIdRef = useRef(0);
+  const showToast = useCallback((text: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, text }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  }, []);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRotateHint, setShowRotateHint] = useState(false);
@@ -260,6 +273,10 @@ export function Room() {
 
   const cancelUpload = () => { xhrRef.current?.abort(); };
 
+  const handleSetPlaybackRate = useCallback((rate: number) => {
+    (videoPlayer.videoPlayerRef.current as any)?.setPlaybackRate?.(rate);
+  }, [videoPlayer.videoPlayerRef]);
+
   const {
     joinVoice,
     toggleMute,
@@ -309,6 +326,7 @@ export function Room() {
     on("queue-updated", (data: { action: string; item?: QueueItem; removedItem?: QueueItem; removedItemId?: string }) => {
       if (data.action === "add" && data.item) {
         setQueue((prev) => [...prev, data.item!]);
+        showToast("Добавлено в очередь");
       } else if (data.action === "next" && data.removedItem) {
         setQueue((prev) => prev.filter((item) => item.id !== data.removedItem!.id));
       } else if (data.action === "remove" && data.removedItemId) {
@@ -588,6 +606,7 @@ export function Room() {
             toggleFullscreen={toggleFullscreen}
             apiUrl={apiUrl}
             displayTime={videoPlayer.displayTime}
+            onSetPlaybackRate={handleSetPlaybackRate}
           />
         </div>
       )}
@@ -620,6 +639,7 @@ export function Room() {
             toggleManualAd={videoPlayer.toggleManualAd}
             toggleHostOnly={videoPlayer.toggleHostOnly}
             displayTime={videoPlayer.displayTime}
+            onSetPlaybackRate={handleSetPlaybackRate}
             reactions={reactions}
             floatingMessages={floatingMessages}
             voiceConnected={voiceConnected}
@@ -675,6 +695,15 @@ export function Room() {
           onDismiss={() => setShowVoiceModal(false)}
         />
       )}
+
+      {/* Toasts */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        {toasts.map((t) => (
+          <div key={t.id} className="px-4 py-2 rounded-xl bg-white/10 backdrop-blur-xl border border-white/10 text-white/90 text-sm shadow-lg">
+            {t.text}
+          </div>
+        ))}
+      </div>
 
     </div>
   );
