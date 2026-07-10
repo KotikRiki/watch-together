@@ -111,14 +111,11 @@ export function useVideoPlayer({
     };
 
     const handleHeartbeat = (data: { time: number; isPlaying: boolean; userId: string }) => {
-      // While an ad is playing on this device, don't let peer heartbeats
-      // (re)start playback — the device stays paused for the ad.
       if (adPlayingRef.current) return;
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
       if (sinceExternal < 1500) return;
       const sinceUserAction = Date.now() - lastUserActionRef.current;
       if (sinceUserAction < 2000) return;
-      // Grace period after video load — don't correct during initial buffer
       if (videoReadyAtRef.current && Date.now() - videoReadyAtRef.current < 10000) return;
 
       heartbeatSyncingRef.current = true;
@@ -131,13 +128,6 @@ export function useVideoPlayer({
         const drift = Math.abs(data.time - localTime);
         if (drift > 2) {
           videoPlayerRef.current?.seek(data.time);
-        }
-        if (sinceExternal > 3000) {
-          if (data.isPlaying && playerStateRef.current !== "playing") {
-            videoPlayerRef.current?.play();
-          } else if (!data.isPlaying && playerStateRef.current !== "paused") {
-            videoPlayerRef.current?.pause();
-          }
         }
       }
     };
@@ -156,12 +146,12 @@ export function useVideoPlayer({
     };
 
     const handleAdStateChanged = (data: { isAd: boolean }) => {
-      // Server uses socket.to() so ad presser never receives this.
-      // But just in case — if we are the presser, ignore.
       if (manualAdRef.current || isAdPresserRef.current) return;
       setAdPlaying(data.isAd);
       adSyncRef.current = true;
       setTimeout(() => { adSyncRef.current = false; }, 800);
+      lastExternalChangeRef.current = Date.now();
+      lastUserActionRef.current = Date.now();
       if (data.isAd) videoPlayerRef.current?.pause();
       else videoPlayerRef.current?.play();
     };
