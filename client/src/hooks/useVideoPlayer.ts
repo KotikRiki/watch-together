@@ -343,12 +343,13 @@ export function useVideoPlayer({
       }, 30000);
       socket?.emit("ad-started", roomCode);
     } else {
-      // End ad — clear timer, resume playback on all
+      // End ad — clear timer, sync time to others (they will play via ad-state-changed)
       if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
       manualAdRef.current = false;
       socket?.emit("ad-ended", roomCode);
+      // Seek others to current time — no play on presser
       const t = videoPlayerRef.current?.getCurrentTime() || 0;
-      emitAndApply("play", t, { apply: true });
+      emitAndApply("seek", t, { apply: false, cooldown: false });
     }
   }, [adPlaying, socket, roomCode, emitAndApply]);
 
