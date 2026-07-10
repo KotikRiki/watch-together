@@ -19,6 +19,7 @@ interface RoomState {
   userTimes: Map<string, { time: number; isPlaying: boolean; username: string }>;
   watchAccumulator: Map<string, number>;
   voiceUsers: Set<string>;
+  emptyTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const rooms = new Map<string, RoomState>();
@@ -127,6 +128,7 @@ export function setupSocketHandlers(io: Server) {
           userTimes: new Map(),
           watchAccumulator: new Map(),
           voiceUsers: new Set(),
+          emptyTimer: null,
         });
       } else {
         // Room in memory — still check password if it's first user (room may have been loaded without password check)
@@ -153,6 +155,12 @@ export function setupSocketHandlers(io: Server) {
       const isFirstUser = roomState.users.size === 0;
       roomState.users.add(socket.id);
       roomState.usernames.set(socket.id, username);
+
+      // Cancel empty-room cleanup timer if someone joined
+      if (isFirstUser && roomState.emptyTimer) {
+        clearTimeout(roomState.emptyTimer);
+        roomState.emptyTimer = null;
+      }
 
       if (isFirstUser) {
         roomState.hostSocketId = socket.id;
@@ -559,7 +567,26 @@ export function setupSocketHandlers(io: Server) {
         roomState.hostSocketId = remaining.length > 0 ? remaining[0] : null;
         if (roomState.hostSocketId) io.to(roomState.hostSocketId).emit("host-changed", { isHost: true });
       }
-      if (roomState.users.size === 0) rooms.delete(roomCode);
+      if (roomState.users.size === 0) {
+        // Don't delete immediately — schedule cleanup after 24 hours
+        roomState.emptyTimer = setTimeout(async () => {
+          const current = rooms.get(roomCode);
+          if (current && current.users.size === 0) {
+            rooms.delete(roomCode);
+            // Delete from DB
+            try {
+              if (current.roomId) {
+                await query("DELETE FROM rooms WHERE id = $1", [current.roomId]);
+              } else {
+                await query("DELETE FROM rooms WHERE code = $1", [roomCode]);
+              }
+              console.log(`Room ${roomCode} deleted after 24h inactivity`);
+            } catch (err: any) {
+              console.error(`Failed to delete room ${roomCode}:`, err.message);
+            }
+          }
+        }, 24 * 60 * 60 * 1000); // 24 hours
+      }
     });
   });
 }
