@@ -329,19 +329,25 @@ export function useVideoPlayer({
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
     manualAdTimerRef.current = setTimeout(() => {
+      setAdPlaying(false);
       manualAdRef.current = false;
       setIsAdPresser(false);
       socket?.emit("ad-ended", roomCode);
+      // Resume playback after auto-end
+      const t = videoPlayerRef.current?.getCurrentTime() || 0;
+      emitAndApply("play", t, { apply: true });
+      setSyncAction({ action: "play", time: t });
+      setTimeout(() => setSyncAction(null), 300);
     }, 30000);
     if (newAd) socket?.emit("ad-started", roomCode);
     else {
       socket?.emit("ad-ended", roomCode);
       manualAdRef.current = false;
       setIsAdPresser(false);
-      // Safety re-sync on release (in case the ad was pressed late / times drifted)
+      // Resume playback on all devices after ad ends
       const t = videoPlayerRef.current?.getCurrentTime() || 0;
-      emitAndApply("seek", t, { apply: false });
-      setSyncAction({ action: "seek", time: t });
+      emitAndApply("play", t, { apply: true });
+      setSyncAction({ action: "play", time: t });
       setTimeout(() => setSyncAction(null), 300);
     }
   }, [adPlaying, socket, roomCode, emitAndApply]);
