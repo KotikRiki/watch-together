@@ -91,6 +91,8 @@ export function useVideoPlayer({
     };
 
     const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
+      syncFromActionRef.current = true;
+      setTimeout(() => { syncFromActionRef.current = false; }, 500);
       if (data.action === "play") {
         videoPlayerRef.current?.play();
       } else if (data.action === "pause") {
@@ -308,11 +310,15 @@ export function useVideoPlayer({
     setAdPlaying(newAd);
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-    manualAdTimerRef.current = setTimeout(() => {
-      setAdPlaying(false);
-      manualAdRef.current = false;
-      socket?.emit("ad-ended", roomCode);
-    }, 30000);
+    if (newAd) {
+      manualAdTimerRef.current = setTimeout(() => {
+        setAdPlaying(false);
+        manualAdRef.current = false;
+        const time = videoPlayerRef.current?.getCurrentTime() || 0;
+        emitVideoSync("play", time);
+        socket?.emit("ad-ended", roomCode);
+      }, 30000);
+    }
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoSync(newAd ? "pause" : "play", time);
     if (newAd) socket?.emit("ad-started", roomCode);
