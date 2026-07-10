@@ -291,6 +291,10 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
       },
       seek: (time: number) => {
         currentTimeRef.current = time;
+        // Mark as sync-driven so the resulting "seeked" event does not
+        // re-broadcast the seek (which caused a ping-pong feedback loop).
+        syncActiveRef.current = true;
+        setTimeout(() => { syncActiveRef.current = false; }, 800);
         if (isFile && videoRef.current) {
           videoRef.current.currentTime = time;
         } else if (videoInfo?.type === "youtube") {
@@ -310,7 +314,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           videoRef.current.playbackRate = rate;
         }
       },
-      smoothCorrect: (targetTime: number, isPlaying: boolean) => {
+      smoothCorrect: (targetTime: number, _isPlaying: boolean) => {
         const vid = videoRef.current;
         if (!vid) return;
 
@@ -318,24 +322,24 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         const drift = current - targetTime;
         const absDrift = Math.abs(drift);
 
-        // Ignore small drifts — no correction needed
-        if (absDrift < 3) return;
-
-        // Large drift: hard seek (pause → seek → play)
-        if (absDrift > 5) {
-          const wasPlaying = !vid.paused;
-          vid.pause();
-          vid.currentTime = Math.max(0, targetTime);
-          if (wasPlaying && isPlaying) vid.play().catch(() => {});
+        // No correction needed for tiny drift
+        if (absDrift < 2) {
+          if (vid.playbackRate !== 1) vid.playbackRate = 1;
           return;
         }
 
-        // Medium drift (1.5–5s): gentle playback rate adjustment
-        const rate = Math.max(0.9, Math.min(1.1, 1 + drift * -0.15));
-        vid.playbackRate = rate;
+        // We are BEHIND the peer: jump forward to catch up (no rollback feel)
+        if (drift < -4) {
+          vid.currentTime = Math.max(0, targetTime);
+          return;
+        }
+
+        // We are AHEAD of the peer: never jump backward — gently slow down
+        // so the peer can catch up, then restore normal speed.
+        vid.playbackRate = 0.92;
         setTimeout(() => {
           if (vid && vid.playbackRate !== 1) vid.playbackRate = 1;
-        }, 1000);
+        }, 2000);
       },
     }));
 
