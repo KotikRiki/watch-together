@@ -41,7 +41,6 @@ interface DesktopLayoutProps {
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
-  isAdPresser: boolean;
   isHost: boolean;
   hostOnly: boolean;
   isFullscreen: boolean;
@@ -96,7 +95,7 @@ interface DesktopLayoutProps {
 
 export function DesktopLayout(props: DesktopLayoutProps) {
   const {
-    videoPlayerRef, videoUrl, videoType, playerState, playerReady, canControl, adPlaying, isAdPresser,
+    videoPlayerRef, videoUrl, videoType, playerState, playerReady, canControl, adPlaying,
     isHost, hostOnly, isFullscreen, peerTimes, watchTimes, syncAction,
     handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
@@ -156,7 +155,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
             playerReady={playerReady}
             canControl={canControl}
             adPlaying={adPlaying}
-            isAdPresser={isAdPresser}            videoUrl={videoUrl}
+            videoUrl={videoUrl}
             videoType={videoType}
             onPlayPause={handlePlayPause}
             onSeek={handleSeek}

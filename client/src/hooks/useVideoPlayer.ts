@@ -20,6 +20,7 @@ export function useVideoPlayer({
   username,
   isLandscape,
   emitVideoAction,
+  emitVideoSync,
   emitPlayNext,
   on,
   off,
@@ -30,7 +31,6 @@ export function useVideoPlayer({
   const [playerReady, setPlayerReady] = useState(false);
   const [syncAction, setSyncAction] = useState<{ action: string; time: number } | null>(null);
   const [adPlaying, setAdPlaying] = useState(false);
-  const [isAdPresser, setIsAdPresser] = useState(false);
   const [peerTimes, setPeerTimes] = useState<{ time: number; isPlaying: boolean; username: string }[]>([]);
   const [watchTimes, setWatchTimes] = useState<{ username: string; seconds: number }[]>([]);
   const [isHost, setIsHost] = useState(false);
@@ -48,7 +48,6 @@ export function useVideoPlayer({
   const syncFromActionRef = useRef(false);
   const manualAdRef = useRef(false);
   const adSyncRef = useRef(false);
-  const isAdPresserRef = useRef(false);
   const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatSyncingRef = useRef(false);
@@ -63,22 +62,15 @@ export function useVideoPlayer({
   }, [adPlaying]);
 
   useEffect(() => {
-    isAdPresserRef.current = isAdPresser;
-  }, [isAdPresser]);
-
-  // Track when player becomes ready for grace period
-  useEffect(() => {
     if (playerReady) {
       videoReadyAtRef.current = Date.now();
     }
   }, [playerReady]);
 
-  // Reset grace period on video change
   useEffect(() => {
     videoReadyAtRef.current = 0;
   }, [videoUrl]);
 
-  // Socket events
   useEffect(() => {
     if (!socket) return;
 
@@ -99,7 +91,6 @@ export function useVideoPlayer({
     };
 
     const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
-      // Apply sync directly without state update for faster response
       if (data.action === "play") {
         videoPlayerRef.current?.play();
       } else if (data.action === "pause") {
@@ -111,6 +102,7 @@ export function useVideoPlayer({
     };
 
     const handleHeartbeat = (data: { time: number; isPlaying: boolean; userId: string }) => {
+      if (data.userId === socket.id) return;
       if (adPlayingRef.current) return;
       const sinceExternal = Date.now() - lastExternalChangeRef.current;
       if (sinceExternal < 1500) return;
@@ -129,6 +121,13 @@ export function useVideoPlayer({
         if (drift > 2) {
           videoPlayerRef.current?.seek(data.time);
         }
+        if (sinceExternal > 3000) {
+          if (data.isPlaying && playerStateRef.current !== "playing") {
+            videoPlayerRef.current?.play();
+          } else if (!data.isPlaying && playerStateRef.current !== "paused") {
+            videoPlayerRef.current?.pause();
+          }
+        }
       }
     };
 
@@ -146,14 +145,7 @@ export function useVideoPlayer({
     };
 
     const handleAdStateChanged = (data: { isAd: boolean }) => {
-      if (manualAdRef.current || isAdPresserRef.current) return;
       setAdPlaying(data.isAd);
-      adSyncRef.current = true;
-      setTimeout(() => { adSyncRef.current = false; }, 800);
-      lastExternalChangeRef.current = Date.now();
-      lastUserActionRef.current = Date.now();
-      if (data.isAd) videoPlayerRef.current?.pause();
-      else videoPlayerRef.current?.play();
     };
 
     const handleWatchTimeUpdate = (data: { watchTimes: { username: string; seconds: number }[] }) => {
@@ -184,7 +176,6 @@ export function useVideoPlayer({
     };
   }, [socket, videoType]);
 
-  // Auto-play next from queue when video ends (host only)
   useEffect(() => {
     if (playerState === "ended" && isHost) {
       const timer = setTimeout(() => {
@@ -194,7 +185,6 @@ export function useVideoPlayer({
     }
   }, [playerState, isHost, emitPlayNext]);
 
-  // Apply pending room state when player becomes ready
   useEffect(() => {
     if (!playerReady) return;
     const pending = pendingStateRef.current;
@@ -208,13 +198,12 @@ export function useVideoPlayer({
     }
   }, [playerReady]);
 
-  // Heartbeat
   useEffect(() => {
     if (!socket || !playerReady) return;
     const interval = isLandscape ? 8000 : 5000;
     heartbeatIntervalRef.current = setInterval(() => {
       const time = videoPlayerRef.current?.getCurrentTime() || 0;
-      if (!adPlayingRef.current) {
+      if (!adPlaying) {
         socket.emit("heartbeat", roomCode, time, playerStateRef.current === "playing", username);
       }
     }, interval);
@@ -223,9 +212,8 @@ export function useVideoPlayer({
         clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [socket, roomCode, playerReady, username, isLandscape]);
+  }, [socket, roomCode, playerReady, username, isLandscape, adPlaying]);
 
-  // Periodic time display update (1Hz when playing)
   useEffect(() => {
     if (!playerReady || playerState !== "playing") {
       setDisplayTime(videoPlayerRef.current?.getCurrentTime() || 0);
@@ -256,12 +244,11 @@ export function useVideoPlayer({
   }, [emitVideoAction]);
 
   const handlePlayPause = useCallback(() => {
-    if (!canControl) return;
-    if (adPlayingRef.current && manualAdRef.current) return;
+    if (!canControl || adPlaying) return;
     const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitAndApply(action, time, { apply: true });
-  }, [canControl, playerState, emitAndApply]);
+  }, [canControl, playerState, adPlaying, emitAndApply]);
 
   const handleSeek = useCallback((time: number) => {
     if (!canControl || adPlaying) return;
@@ -290,7 +277,7 @@ export function useVideoPlayer({
     socket?.emit("set-host-only", roomCode, newVal);
   }, [isHost, hostOnly, socket, roomCode]);
 
-    const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
+  const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
     if (syncFromActionRef.current) return;
     if (heartbeatSyncingRef.current) return;
     if (adSyncRef.current) return;
@@ -298,7 +285,7 @@ export function useVideoPlayer({
     emitAndApply(newState === "playing" ? "play" : "pause", time, { cooldown: true });
   }, [emitAndApply]);
 
-    const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
+  const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
     if (!canControl || adPlaying) return;
     if (isUserActionRef.current) return;
     if (heartbeatSyncingRef.current) return;
@@ -308,7 +295,7 @@ export function useVideoPlayer({
     emitAndApply(action, time, { cooldown: true });
   }, [canControl, adPlaying, emitAndApply]);
 
-    const handleAdStateChange = useCallback((playing: boolean) => {
+  const handleAdStateChange = useCallback((playing: boolean) => {
     if (syncFromActionRef.current) return;
     if (heartbeatSyncingRef.current) return;
     if (adSyncRef.current) return;
@@ -319,28 +306,15 @@ export function useVideoPlayer({
   const toggleManualAd = useCallback(() => {
     const newAd = !adPlaying;
     setAdPlaying(newAd);
-    setIsAdPresser(newAd);
-    isAdPresserRef.current = newAd;
-    if (newAd) {
-      // Start ad
-      manualAdRef.current = true;
-      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-      manualAdTimerRef.current = setTimeout(() => {
-        // Auto-end after 30s
-        setAdPlaying(false);
-        setIsAdPresser(false);
-        isAdPresserRef.current = false;
-        manualAdRef.current = false;
-        socket?.emit("ad-ended", roomCode);
-      }, 30000);
-      socket?.emit("ad-started", roomCode);
-    } else {
-      // End ad — just notify server, others will play via ad-state-changed
-      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-      manualAdRef.current = false;
-      socket?.emit("ad-ended", roomCode);
-    }
-  }, [adPlaying, socket, roomCode, emitAndApply]);
+    manualAdRef.current = true;
+    if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+    manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    const action = newAd ? "pause" : "play";
+    emitVideoSync(action, time);
+    if (newAd) socket?.emit("ad-started", roomCode);
+    else socket?.emit("ad-ended", roomCode);
+  }, [adPlaying, socket, roomCode, emitVideoSync]);
 
   return {
     videoUrl,
@@ -349,7 +323,6 @@ export function useVideoPlayer({
     playerReady,
     syncAction,
     adPlaying,
-    isAdPresser,
     peerTimes,
     watchTimes,
     isHost,

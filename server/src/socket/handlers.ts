@@ -239,7 +239,18 @@ export function setupSocketHandlers(io: Server) {
 
       logEvent(roomCode, roomState.usernames.get(socket.id) || "", socket.id, "video-action", { action, time });
 
-      io.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+      socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
+    });
+
+    socket.on("ad-sync", (roomCode: string, action: string, time: number) => {
+      const roomState = rooms.get(roomCode);
+      if (!roomState) return;
+
+      roomState.isPlaying = action === "play";
+      roomState.currentTime = time;
+      roomState.lastSyncTime = Date.now();
+
+      socket.to(roomCode).emit("video-sync", { action, time, userId: socket.id });
     });
 
     socket.on("heartbeat", (roomCode: string, time: number, isPlaying: boolean, username: string) => {
@@ -298,21 +309,17 @@ export function setupSocketHandlers(io: Server) {
     socket.on("ad-started", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      if (socket.id !== roomState.hostSocketId) return;
-      roomState.adPlaying = true;
       const socketUsername = roomState.usernames.get(socket.id) || "";
       logEvent(roomCode, socketUsername, socket.id, "ad-started");
-      socket.to(roomCode).emit("ad-state-changed", { isAd: true });
+      io.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
     socket.on("ad-ended", (roomCode: string) => {
       const roomState = rooms.get(roomCode);
       if (!roomState) return;
-      if (socket.id !== roomState.hostSocketId) return;
-      roomState.adPlaying = false;
       const socketUsername = roomState.usernames.get(socket.id) || "";
       logEvent(roomCode, socketUsername, socket.id, "ad-ended");
-      socket.to(roomCode).emit("ad-state-changed", { isAd: false });
+      io.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
     socket.on("ad-sync", (roomCode: string, action: string, time: number) => {

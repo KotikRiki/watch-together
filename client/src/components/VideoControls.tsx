@@ -6,7 +6,6 @@ interface VideoControlsProps {
   playerReady: boolean;
   canControl: boolean;
   adPlaying: boolean;
-  isAdPresser: boolean;
   videoUrl: string;
   videoType: "file" | "embed";
   onPlayPause: () => void;
@@ -79,7 +78,7 @@ function AdIcon() {
 }
 
 export function VideoControls(props: VideoControlsProps) {
-  const { variant, playerReady, canControl, adPlaying, isAdPresser, videoUrl, videoType, onPlayPause, onSeekRelative, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile, onSetPlaybackRate } = props;
+  const { variant, playerReady, canControl, adPlaying, videoUrl, videoType, onPlayPause, onSeekRelative, onSync, onToggleAd, onToggleFullscreen, isFullscreen, currentTime, voiceConnected, voiceMuted, speakingUsers, onVoiceToggle, onShowVoiceModal, showCall, onToggleCall, uploading, uploadProgress, uploadSpeed, uploadRemaining, onCancelUpload, onUploadFile, onSetPlaybackRate } = props;
   const [rateIdx, setRateIdx] = useState(1);
   const rates = [0.75, 1, 1.25, 1.5, 2];
   const cycleRate = () => {
@@ -105,7 +104,7 @@ export function VideoControls(props: VideoControlsProps) {
         {adPlaying && (
           <span className="bg-red-500/15 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-medium border border-red-500/10 animate-pulse">Реклама</span>
         )}
-        <button onClick={onPlayPause} disabled={!playerReady || !canControl || isAdPresser} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-white/10 disabled:to-white/10 text-white disabled:text-white/30 px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all active:scale-95 shadow-lg shadow-blue-500/10 disabled:shadow-none">
+        <button onClick={onPlayPause} disabled={!playerReady || !canControl || adPlaying} className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-white/10 disabled:to-white/10 text-white disabled:text-white/30 px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-all active:scale-95 shadow-lg shadow-blue-500/10 disabled:shadow-none">
           {props.playerState === "playing" ? "Пауза" : "Играть"}
         </button>
         <div className="flex items-center gap-0.5">
@@ -135,7 +134,7 @@ export function VideoControls(props: VideoControlsProps) {
           <div className="flex items-center gap-2">
             {videoUrl && (
               <>
-                <button onClick={onPlayPause} disabled={!playerReady || !canControl || isAdPresser} className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
+                <button onClick={onPlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
                   {props.playerState === "playing" ? <PauseIcon /> : <PlayIcon />}
                 </button>
                 <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
@@ -175,7 +174,7 @@ export function VideoControls(props: VideoControlsProps) {
         ) : !canControl ? (
           <span className="text-orange-400 text-[10px]">🔒</span>
         ) : null}
-        <button onClick={onPlayPause} disabled={!playerReady || !canControl || isAdPresser} className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
+        <button onClick={onPlayPause} disabled={!playerReady || !canControl || adPlaying} className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/25 transition-all active:scale-90">
           {props.playerState === "playing" ? <PauseIcon /> : <PlayIcon />}
         </button>
         <button onClick={() => onSeekRelative(-10)} disabled={!playerReady || !canControl} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/70 disabled:opacity-30 hover:text-white transition-all">
