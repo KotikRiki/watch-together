@@ -300,8 +300,6 @@ export function useVideoPlayer({
   const handleAdStateChange = useCallback((isAd: boolean) => {
     if (manualAdRef.current) return;
     setAdPlaying(isAd);
-    if (isAd) socket?.emit("ad-started", roomCode);
-    else socket?.emit("ad-ended", roomCode);
   }, [socket, roomCode]);
 
   const toggleManualAd = useCallback(() => {
@@ -309,7 +307,10 @@ export function useVideoPlayer({
     setAdPlaying(newAd);
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-    manualAdTimerRef.current = setTimeout(() => { manualAdRef.current = false; }, 30000);
+    manualAdTimerRef.current = setTimeout(() => {
+      manualAdRef.current = false;
+      socket?.emit("ad-ended", roomCode);
+    }, 30000);
     if (newAd) socket?.emit("ad-started", roomCode);
     else socket?.emit("ad-ended", roomCode);
   }, [adPlaying, socket, roomCode]);
