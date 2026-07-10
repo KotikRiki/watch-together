@@ -249,28 +249,51 @@ export function useVideoPlayer({
     if (!canControl || adPlaying) return;
     const action = playerState === "playing" ? "pause" : "play";
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitAndApply(action, time, { apply: true });
-  }, [canControl, playerState, adPlaying, emitAndApply]);
+    emitVideoAction(action, time);
+    lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
+    lastUserActionRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    setSyncAction({ action, time });
+    setTimeout(() => setSyncAction(null), 300);
+  }, [canControl, playerState, adPlaying, emitVideoAction]);
 
   const handleSeek = useCallback((time: number) => {
     if (!canControl || adPlaying) return;
     const t = Math.max(0, time);
-    emitAndApply("seek", t, { apply: true });
-  }, [canControl, adPlaying, emitAndApply]);
+    emitVideoAction("seek", t);
+    lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    setSyncAction({ action: "seek", time });
+    setTimeout(() => setSyncAction(null), 300);
+  }, [canControl, adPlaying, emitVideoAction]);
 
   const handleSeekRelative = useCallback((delta: number) => {
     if (!canControl || adPlaying) return;
     const current = videoPlayerRef.current?.getCurrentTime() || 0;
     const t = Math.max(0, current + delta);
-    emitAndApply("seek", t, { apply: true });
-  }, [canControl, adPlaying, emitAndApply]);
+    emitVideoAction("seek", t);
+    lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    setSyncAction({ action: "seek", time: t });
+    setTimeout(() => setSyncAction(null), 300);
+  }, [canControl, adPlaying, emitVideoAction]);
 
   const handleSync = useCallback(() => {
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitAndApply("seek", time, { apply: false });
+    emitVideoAction("seek", time);
+    lastSyncEventRef.current = Date.now();
+    lastExternalChangeRef.current = Date.now();
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
     setSyncAction({ action: "seek", time });
     setTimeout(() => setSyncAction(null), 300);
-  }, [emitAndApply]);
+  }, [emitVideoAction]);
 
   const toggleHostOnly = useCallback(() => {
     if (!isHost) return;
