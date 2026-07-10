@@ -504,7 +504,7 @@ export function Room() {
   const canControl = videoPlayer.canControl;
 
   return (
-    <div className="min-h-screen bg-[#08080d] flex flex-col relative">
+    <div className="h-screen bg-[#08080d] flex flex-col relative overflow-hidden">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] right-[-10%] w-[40%] h-[40%] bg-blue-600/3 rounded-full blur-[100px]" />
         <div className="absolute bottom-[-15%] left-[-5%] w-[30%] h-[30%] bg-purple-600/3 rounded-full blur-[80px]" />
