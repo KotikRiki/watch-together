@@ -48,6 +48,7 @@ export function useVideoPlayer({
   const syncFromActionRef = useRef(false);
   const manualAdRef = useRef(false);
   const adSyncRef = useRef(false);
+  const isAdPresserRef = useRef(false);
   const manualAdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatSyncingRef = useRef(false);
@@ -60,6 +61,10 @@ export function useVideoPlayer({
   useEffect(() => {
     adPlayingRef.current = adPlaying;
   }, [adPlaying]);
+
+  useEffect(() => {
+    isAdPresserRef.current = isAdPresser;
+  }, [isAdPresser]);
 
   // Track when player becomes ready for grace period
   useEffect(() => {
@@ -151,11 +156,10 @@ export function useVideoPlayer({
     };
 
     const handleAdStateChanged = (data: { isAd: boolean }) => {
-      if (manualAdRef.current) return;
+      // The ad presser handles its own ad state in toggleManualAd.
+      // Don't process the server echo — it causes double play/pause.
+      if (manualAdRef.current || isAdPresserRef.current) return;
       setAdPlaying(data.isAd);
-      // Mark as sync-driven so the resulting native play/pause event
-      // does not re-broadcast (which would pause the device that
-      // pressed the ad, and ping-pong the pause to everyone).
       adSyncRef.current = true;
       setTimeout(() => { adSyncRef.current = false; }, 800);
       if (data.isAd) videoPlayerRef.current?.pause();
@@ -326,29 +330,25 @@ export function useVideoPlayer({
     const newAd = !adPlaying;
     setAdPlaying(newAd);
     setIsAdPresser(newAd);
-    manualAdRef.current = true;
-    if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-    manualAdTimerRef.current = setTimeout(() => {
-      setAdPlaying(false);
+    if (newAd) {
+      // Start ad
+      manualAdRef.current = true;
+      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
+      manualAdTimerRef.current = setTimeout(() => {
+        // Auto-end after 30s
+        setAdPlaying(false);
+        setIsAdPresser(false);
+        manualAdRef.current = false;
+        socket?.emit("ad-ended", roomCode);
+      }, 30000);
+      socket?.emit("ad-started", roomCode);
+    } else {
+      // End ad — clear timer, resume playback on all
+      if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
       manualAdRef.current = false;
-      setIsAdPresser(false);
       socket?.emit("ad-ended", roomCode);
-      // Resume playback after auto-end
       const t = videoPlayerRef.current?.getCurrentTime() || 0;
       emitAndApply("play", t, { apply: true });
-      setSyncAction({ action: "play", time: t });
-      setTimeout(() => setSyncAction(null), 300);
-    }, 30000);
-    if (newAd) socket?.emit("ad-started", roomCode);
-    else {
-      socket?.emit("ad-ended", roomCode);
-      manualAdRef.current = false;
-      setIsAdPresser(false);
-      // Resume playback on all devices after ad ends
-      const t = videoPlayerRef.current?.getCurrentTime() || 0;
-      emitAndApply("play", t, { apply: true });
-      setSyncAction({ action: "play", time: t });
-      setTimeout(() => setSyncAction(null), 300);
     }
   }, [adPlaying, socket, roomCode, emitAndApply]);
 

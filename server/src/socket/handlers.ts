@@ -302,7 +302,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.adPlaying = true;
       const socketUsername = roomState.usernames.get(socket.id) || "";
       logEvent(roomCode, socketUsername, socket.id, "ad-started");
-      io.to(roomCode).emit("ad-state-changed", { isAd: true });
+      socket.to(roomCode).emit("ad-state-changed", { isAd: true });
     });
 
     socket.on("ad-ended", (roomCode: string) => {
@@ -312,7 +312,7 @@ export function setupSocketHandlers(io: Server) {
       roomState.adPlaying = false;
       const socketUsername = roomState.usernames.get(socket.id) || "";
       logEvent(roomCode, socketUsername, socket.id, "ad-ended");
-      io.to(roomCode).emit("ad-state-changed", { isAd: false });
+      socket.to(roomCode).emit("ad-state-changed", { isAd: false });
     });
 
     socket.on("ad-sync", (roomCode: string, action: string, time: number) => {
