@@ -308,21 +308,15 @@ export function useVideoPlayer({
     setAdPlaying(newAd);
     manualAdRef.current = true;
     if (manualAdTimerRef.current) clearTimeout(manualAdTimerRef.current);
-    const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    if (newAd) {
-      videoPlayerRef.current?.pause();
-      socket?.emit("ad-started", roomCode);
-      manualAdTimerRef.current = setTimeout(() => {
-        setAdPlaying(false);
-        manualAdRef.current = false;
-        videoPlayerRef.current?.play();
-        socket?.emit("ad-ended", roomCode);
-      }, 30000);
-    } else {
-      videoPlayerRef.current?.play();
+    manualAdTimerRef.current = setTimeout(() => {
+      setAdPlaying(false);
+      manualAdRef.current = false;
       socket?.emit("ad-ended", roomCode);
-    }
+    }, 30000);
+    const time = videoPlayerRef.current?.getCurrentTime() || 0;
     emitVideoSync(newAd ? "pause" : "play", time);
+    if (newAd) socket?.emit("ad-started", roomCode);
+    else socket?.emit("ad-ended", roomCode);
   }, [adPlaying, socket, roomCode, emitVideoSync]);
 
   return {
