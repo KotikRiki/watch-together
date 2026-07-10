@@ -6,8 +6,8 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
 export const packCache: Record<string, any> = {};
 
-const ADMIN_USER = process.env.ADMIN_USER || "Admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "HeCJB/O4du[v1gGt";
+const ADMIN_USER = process.env.ADMIN_USER || "";
+const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
 function adminAuth(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;

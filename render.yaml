@@ -12,9 +12,9 @@ services:
           name: watch-together-db
           property: connectionString
       - key: ADMIN_USER
-        value: Admin
+        sync: false
       - key: ADMIN_PASS
-        value: HeCJB/O4du[v1gGt
+        sync: false
 
 databases:
   - name: watch-together-db

@@ -5,8 +5,8 @@ import { getActiveRooms, getActiveUserCount, broadcastToRoom } from "../socket/h
 
 export const adminRouter = Router();
 
-const ADMIN_USER = process.env.ADMIN_USER || "Admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "HeCJB/O4du[v1gGt";
+const ADMIN_USER = process.env.ADMIN_USER || "";
+const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
 function authMiddleware(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization;
