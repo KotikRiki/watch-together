@@ -1,4 +1,5 @@
-import { useEffect, useRef, useImperativeHandle, useCallback, forwardRef } from "react";
+import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import { clog } from "../lib/logger";
 
 declare global {
   interface Window {
@@ -13,10 +14,10 @@ interface VideoPlayerProps {
   onTimeUpdate: (time: number) => void;
   onStateChange?: (state: "playing" | "paused" | "ended") => void;
   onPlayerReady?: () => void;
-  onAdStateChange?: (isAd: boolean) => void;
   onExternalStateChange?: (state: "playing" | "paused") => void;
   onUserAction?: (action: "play" | "pause" | "seek", time: number) => void;
   syncAction: { action: string; time: number } | null;
+  onAdEnd?: (time: number) => void;
 }
 
 export interface VideoPlayerHandle {
@@ -43,25 +44,16 @@ function getVideoInfo(url: string): { type: string; id: string } | null {
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
-  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onAdStateChange, onExternalStateChange, onUserAction, syncAction }, ref) {
+  function VideoPlayer({ videoUrl, videoType, onTimeUpdate, onStateChange, onPlayerReady, onExternalStateChange, onUserAction, syncAction, onAdEnd }, ref) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const currentTimeRef = useRef(0);
     const readyRef = useRef(false);
     const syncActiveRef = useRef(false);
     const lastCommandTimeRef = useRef(0);
-    const adTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+    const wasAdvertRef = useRef(false);
     const isFile = videoType === "file";
     const videoInfo = !isFile && videoUrl ? getVideoInfo(videoUrl) : null;
-
-    const handleAdDetected = useCallback(() => {
-      onAdStateChange?.(true);
-      if (adTimerRef.current) clearTimeout(adTimerRef.current);
-      adTimerRef.current = setTimeout(() => {
-        onAdStateChange?.(false);
-      }, 5000);
-    }, [onAdStateChange]);
 
     // HTML5 video player for uploaded files
     useEffect(() => {
@@ -77,6 +69,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         }
       };
       const onPause = () => {
+        clog("NATIVE-PAUSE", `syncActive=${syncActiveRef.current} time=${vid.currentTime}`);
         onStateChange?.("paused");
         if (!syncActiveRef.current) {
           onExternalStateChange?.("paused");
@@ -131,6 +124,7 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           if (msg.event === "onStateChange") {
             const state = msg.info?.playerState;
             const isOurCommand = Date.now() - lastCommandTimeRef.current < 1500;
+            clog("YT-STATE", `state=${state} isOur=${isOurCommand} syncActive=${syncActiveRef.current}`);
             if (state === 1) { // PLAYING
               onStateChange?.("playing");
               if (!syncActiveRef.current) {
@@ -138,7 +132,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
                   onExternalStateChange?.("playing");
                   onUserAction?.("play", msg.info?.currentTime || 0);
                 } else {
-                  handleAdDetected();
+                  onExternalStateChange?.("playing");
+                  onUserAction?.("play", msg.info?.currentTime || 0);
                 }
               }
             } else if (state === 2) { // PAUSED
@@ -148,7 +143,8 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
                   onExternalStateChange?.("paused");
                   onUserAction?.("pause", msg.info?.currentTime || 0);
                 } else {
-                  handleAdDetected();
+                  onExternalStateChange?.("paused");
+                  onUserAction?.("pause", msg.info?.currentTime || 0);
                 }
               }
             } else if (state === 0) { // ENDED
@@ -201,24 +197,34 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
           }
           if (msg.type === "player:changeState") {
             const isOurCommand = Date.now() - lastCommandTimeRef.current < 1500;
-            if (msg.data?.state === "playing") {
+            const state = msg.data?.state;
+            clog("RT-STATE", `state=${state} isOur=${isOurCommand} syncActive=${syncActiveRef.current}`);
+            if (state === "advert") {
+              wasAdvertRef.current = true;
+            } else if (state === "playing") {
               onStateChange?.("playing");
               if (!syncActiveRef.current) {
-                if (isOurCommand) {
+                if (wasAdvertRef.current) {
+                  wasAdvertRef.current = false;
+                  clog("AD-END", `resuming after advert time=${currentTimeRef.current.toFixed(1)}`);
+                  onAdEnd?.(currentTimeRef.current);
+                } else if (isOurCommand) {
                   onExternalStateChange?.("playing");
                   onUserAction?.("play", currentTimeRef.current);
                 } else {
-                  handleAdDetected();
+                  onExternalStateChange?.("playing");
+                  onUserAction?.("play", currentTimeRef.current);
                 }
               }
-            } else if (msg.data?.state === "paused") {
+            } else if (state === "paused" || state === "pause") {
               onStateChange?.("paused");
               if (!syncActiveRef.current) {
                 if (isOurCommand) {
                   onExternalStateChange?.("paused");
                   onUserAction?.("pause", currentTimeRef.current);
                 } else {
-                  handleAdDetected();
+                  onExternalStateChange?.("paused");
+                  onUserAction?.("pause", currentTimeRef.current);
                 }
               }
             }
@@ -351,7 +357,6 @@ export const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(
     useEffect(() => {
       readyRef.current = false;
       currentTimeRef.current = 0;
-      if (adTimerRef.current) clearTimeout(adTimerRef.current);
     }, [videoUrl, videoInfo?.id, isFile]);
 
     // Empty state

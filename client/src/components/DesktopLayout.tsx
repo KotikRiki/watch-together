@@ -51,8 +51,8 @@ interface DesktopLayoutProps {
   handleSeek: (time: number) => void;
   handleSeekRelative: (delta: number) => void;
   handleSync: () => void;
-  handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
+  handleAdEnd: (time: number) => void;
   handleUserAction: (action: "play" | "pause" | "seek", time: number) => void;
   setPlayerState: Dispatch<SetStateAction<"ended" | "playing" | "paused">>;
   setPlayerReady: (ready: boolean) => void;
@@ -97,7 +97,7 @@ export function DesktopLayout(props: DesktopLayoutProps) {
   const {
     videoPlayerRef, videoUrl, videoType, playerState, playerReady, canControl, adPlaying,
     isHost, hostOnly, isFullscreen, peerTimes, watchTimes, syncAction,
-    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleExternalStateChange, handleAdEnd,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, queue, socket, code, username, emitQueueAdd, emitQueueNext,
     handleDownloadToServer, downloading, downloadProgress,
@@ -120,9 +120,9 @@ export function DesktopLayout(props: DesktopLayoutProps) {
             onTimeUpdate={() => {}}
             onStateChange={(state) => setPlayerState(state)}
             onPlayerReady={() => setPlayerReady(true)}
-            onAdStateChange={handleAdStateChange}
             onExternalStateChange={handleExternalStateChange}
             onUserAction={handleUserAction}
+            onAdEnd={handleAdEnd}
             syncAction={syncAction}
           />
           {reactions.map((r) => (

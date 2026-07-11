@@ -583,8 +583,8 @@ export function Room() {
             handleSeek={videoPlayer.handleSeek}
             handleSeekRelative={videoPlayer.handleSeekRelative}
             handleSync={videoPlayer.handleSync}
-            handleAdStateChange={videoPlayer.handleAdStateChange}
             handleExternalStateChange={videoPlayer.handleExternalStateChange}
+            handleAdEnd={videoPlayer.handleAdEnd}
             handleUserAction={videoPlayer.handleUserAction}
             setPlayerState={videoPlayer.setPlayerState}
             setPlayerReady={videoPlayer.setPlayerReady}
@@ -647,8 +647,8 @@ export function Room() {
             handleSeek={videoPlayer.handleSeek}
             handleSeekRelative={videoPlayer.handleSeekRelative}
             handleSync={videoPlayer.handleSync}
-            handleAdStateChange={videoPlayer.handleAdStateChange}
             handleExternalStateChange={videoPlayer.handleExternalStateChange}
+            handleAdEnd={videoPlayer.handleAdEnd}
             handleUserAction={videoPlayer.handleUserAction}
             setPlayerState={videoPlayer.setPlayerState}
             setPlayerReady={videoPlayer.setPlayerReady}

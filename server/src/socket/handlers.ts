@@ -532,6 +532,11 @@ export function setupSocketHandlers(io: Server) {
       socket.to(roomCode).emit("voice-speaking", socket.id, speaking);
     });
 
+    socket.on("client-log", (roomCode: string, tag: string, msg: string) => {
+      const username = (socket as any).username || "?";
+      console.log(`[CLIENT][${roomCode}][${username}][${tag}] ${msg}`);
+    });
+
     socket.on("disconnect", async () => {
       const roomCode = (socket as any).roomCode;
       const username = (socket as any).username || "unknown";

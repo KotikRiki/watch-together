@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Socket } from "socket.io-client";
 import type { VideoPlayerHandle } from "../components/VideoPlayer";
+import { clog, setLogSocket } from "../lib/logger";
 
 interface UseVideoPlayerOptions {
   socket: Socket | null;
@@ -54,6 +55,10 @@ export function useVideoPlayer({
   const videoReadyAtRef = useRef(0);
 
   useEffect(() => {
+    setLogSocket(socket, roomCode);
+  }, [socket, roomCode]);
+
+  useEffect(() => {
     playerStateRef.current = playerState;
   }, [playerState]);
 
@@ -91,12 +96,17 @@ export function useVideoPlayer({
     };
 
     const handleVideoSync = (data: { action: string; time: number; userId: string }) => {
+      const myTime = videoPlayerRef.current?.getCurrentTime() || 0;
+      const drift = Math.abs(data.time - myTime);
+      clog("VIDEO-SYNC", `action=${data.action} from=${data.userId} drift=${drift.toFixed(1)}s state=${playerStateRef.current} ad=${adPlayingRef.current}`);
       syncFromActionRef.current = true;
       isUserActionRef.current = true;
       setTimeout(() => { syncFromActionRef.current = false; isUserActionRef.current = false; }, 500);
       if (data.action === "play") {
+        setPlayerState("playing");
         videoPlayerRef.current?.play();
       } else if (data.action === "pause") {
+        setPlayerState("paused");
         videoPlayerRef.current?.pause();
       } else if (data.action === "seek") {
         videoPlayerRef.current?.seek(data.time);
@@ -126,10 +136,18 @@ export function useVideoPlayer({
         }
         if (sinceExternal > 3000) {
           if (data.isPlaying && playerStateRef.current !== "playing") {
+            clog("HB", `PLAY from=${data.userId} hbTime=${data.time.toFixed(1)} localTime=${localTime.toFixed(1)} drift=${drift.toFixed(1)}s state=${playerStateRef.current}`);
+            setPlayerState("playing");
             videoPlayerRef.current?.play();
           } else if (!data.isPlaying && playerStateRef.current !== "paused") {
+            clog("HB", `PAUSE from=${data.userId} hbTime=${data.time.toFixed(1)} localTime=${localTime.toFixed(1)} drift=${drift.toFixed(1)}s state=${playerStateRef.current}`);
+            setPlayerState("paused");
             videoPlayerRef.current?.pause();
+          } else {
+            clog("HB", `OK from=${data.userId} hbPlaying=${data.isPlaying} localState=${playerStateRef.current}`);
           }
+        } else {
+          clog("HB", `SKIP(sinceExt=${sinceExternal}ms) from=${data.userId} hbPlaying=${data.isPlaying}`);
         }
       }
     };
@@ -304,30 +322,33 @@ export function useVideoPlayer({
   }, [isHost, hostOnly, socket, roomCode]);
 
   const handleExternalStateChange = useCallback((newState: "playing" | "paused") => {
-    if (syncFromActionRef.current) return;
-    if (heartbeatSyncingRef.current) return;
-    if (adSyncRef.current) return;
+    if (syncFromActionRef.current) { clog("EXT-STATE", `BLOCKED(syncFrom) newState=${newState}`); return; }
+    if (heartbeatSyncingRef.current) { clog("EXT-STATE", `BLOCKED(hb) newState=${newState}`); return; }
+    if (adSyncRef.current) { clog("EXT-STATE", `BLOCKED(ad) newState=${newState}`); return; }
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
+    clog("EXT-STATE", `EMIT newState=${newState} time=${time.toFixed(1)} state=${playerStateRef.current}`);
     emitAndApply(newState === "playing" ? "play" : "pause", time, { cooldown: true });
   }, [emitAndApply]);
 
+  const handleAdEnd = useCallback((time: number) => {
+    clog("AD-END-emit", `resync after ad time=${time.toFixed(1)}`);
+    setPlayerState("playing");
+    syncFromActionRef.current = true;
+    setTimeout(() => { syncFromActionRef.current = false; }, 500);
+    emitVideoSync("play", time);
+    emitVideoSync("seek", time);
+  }, [emitVideoSync]);
+
   const handleUserAction = useCallback((action: "play" | "pause" | "seek", time: number) => {
-    if (!canControl || adPlaying) return;
-    if (isUserActionRef.current) return;
-    if (heartbeatSyncingRef.current) return;
-    if (adSyncRef.current) return;
+    if (!canControl || adPlaying) { clog("USER-ACT", `BLOCKED canControl=${canControl} ad=${adPlaying} action=${action}`); return; }
+    if (isUserActionRef.current) { clog("USER-ACT", `BLOCKED(isUser) action=${action}`); return; }
+    if (heartbeatSyncingRef.current) { clog("USER-ACT", `BLOCKED(hb) action=${action}`); return; }
+    if (adSyncRef.current) { clog("USER-ACT", `BLOCKED(ad) action=${action}`); return; }
+    clog("USER-ACT", `action=${action} time=${time.toFixed(1)} state=${playerStateRef.current}`);
     isUserActionRef.current = true;
     setTimeout(() => { isUserActionRef.current = false; }, 300);
     emitAndApply(action, time, { cooldown: true });
   }, [canControl, adPlaying, emitAndApply]);
-
-  const handleAdStateChange = useCallback((playing: boolean) => {
-    if (syncFromActionRef.current) return;
-    if (heartbeatSyncingRef.current) return;
-    if (adSyncRef.current) return;
-    const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitAndApply(playing ? "play" : "pause", time, { cooldown: true });
-  }, [emitAndApply]);
 
   const toggleManualAd = useCallback(() => {
     const newAd = !adPlaying;
@@ -344,9 +365,13 @@ export function useVideoPlayer({
       }, 30000);
     }
     const time = videoPlayerRef.current?.getCurrentTime() || 0;
-    emitVideoSync(newAd ? "pause" : "play", time);
-    if (newAd) socket?.emit("ad-started", roomCode);
-    else socket?.emit("ad-ended", roomCode);
+    if (newAd) {
+      emitVideoSync("pause", time);
+      socket?.emit("ad-started", roomCode);
+    } else {
+      emitVideoSync("play", time);
+      socket?.emit("ad-ended", roomCode);
+    }
   }, [adPlaying, socket, roomCode, emitVideoSync]);
 
   return {
@@ -377,7 +402,7 @@ export function useVideoPlayer({
     toggleHostOnly,
     handleExternalStateChange,
     handleUserAction,
-    handleAdStateChange,
+    handleAdEnd,
     toggleManualAd,
   };
 }

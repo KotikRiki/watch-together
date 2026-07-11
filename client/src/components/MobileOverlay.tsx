@@ -35,8 +35,8 @@ interface MobileOverlayProps {
   handleSync: () => void;
   displayTime: number;
   onSetPlaybackRate?: (rate: number) => void;
-  handleAdStateChange: (playing: boolean) => void;
   handleExternalStateChange: (state: "playing" | "paused") => void;
+  handleAdEnd: (time: number) => void;
   handleUserAction: (action: "play" | "pause" | "seek", time: number) => void;
   setPlayerState: Dispatch<SetStateAction<"ended" | "playing" | "paused">>;
   setPlayerReady: (ready: boolean) => void;
@@ -98,7 +98,7 @@ export function MobileOverlay(props: MobileOverlayProps) {
   const {
     isLandscape, isFullscreen, videoPlayerRef, videoUrl, videoType, playerState, playerReady,
     canControl, adPlaying, isHost, hostOnly, syncAction,
-    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleAdStateChange, handleExternalStateChange, displayTime, onSetPlaybackRate,
+    handlePlayPause, handleSeek, handleSeekRelative, handleSync, handleExternalStateChange, handleAdEnd, displayTime, onSetPlaybackRate,
     handleUserAction, setPlayerState, setPlayerReady, toggleManualAd, toggleHostOnly,
     reactions, floatingMessages,
     voiceConnected, voiceMuted, speakingUsers, localVolume, toggleMute, setShowVoiceModal,
@@ -125,9 +125,9 @@ export function MobileOverlay(props: MobileOverlayProps) {
           onTimeUpdate={() => {}}
           onStateChange={(state) => setPlayerState(state)}
           onPlayerReady={() => setPlayerReady(true)}
-          onAdStateChange={handleAdStateChange}
           onExternalStateChange={handleExternalStateChange}
           onUserAction={handleUserAction}
+          onAdEnd={handleAdEnd}
           syncAction={syncAction}
         />
 
